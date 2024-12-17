@@ -41,20 +41,23 @@ except Exception as e:
     st.sidebar.error(f"Error loading model: {e}")
     st.stop()
 
+
 # Process Uploaded Images
 if uploaded_files:
     st.markdown("### Processing Results:")
+    results_count = {'True': 0, 'False': 0}
     results_data = []
     detected_images = []
 
     progress_bar = st.progress(0)
     total_files = len(uploaded_files)
 
+
     for idx, uploaded_file in enumerate(uploaded_files):
         try:
             original_image = Image.open(uploaded_file)
             results = model(original_image)
-
+            
             # Collect statistics
             true_count = sum(result[-1] > confidence_threshold for result in results.pred[0])
             false_count = len(results.pred[0]) - true_count
@@ -66,10 +69,16 @@ if uploaded_files:
                 "Confidence Avg": results.pred[0][:, -1].mean().item() if len(results.pred[0]) > 0 else 0
             })
 
-            detected_images.append(Image.fromarray(results.render()[0]))
+            for result in results.pred[0]:
+                if result[-1] > 0.5:
+                    results_count['True'] += 1
+                else:
+                    results_count['False'] += 1
 
+            detected_images.append(Image.fromarray(results.render()[0]))
         except Exception as e:
             st.error(f"Error processing image {uploaded_file.name}: {e}")
+
 
         progress_bar.progress((idx + 1) / total_files)
 
@@ -78,20 +87,51 @@ if uploaded_files:
     df_results = pd.DataFrame(results_data)
     st.dataframe(df_results)
 
-    # Pie Chart
-    total_true = df_results['True'].sum()
-    total_false = df_results['False'].sum()
-    if total_true + total_false > 0:
-        labels = ['True', 'False']
-        # แปลงค่า total_true และ total_false ให้เป็น float หรือ list ก่อน
-        sizes = [float(total_true), float(total_false)]
-        colors = ['#90CAF9', '#1E88E5']
+    # Display Pie Chart
+    if results_count['True'] > 0 or results_count['False'] > 0:
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
 
-        fig, ax = plt.subplots()
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'color': 'white'})
-        ax.axis('equal')
+        # Pie Chart Data
+        labels = []
+        sizes = []
+        colors = []
+
+        if results_count['True'] > 0:
+            labels.append('True')
+            sizes.append(results_count['True'])
+            colors.append('#90CAF9')  # สีฟ้าอ่อน
+
+        if results_count['False'] > 0:
+            labels.append('False')
+            sizes.append(results_count['False'])
+            colors.append('#1E88E5')  # สีน้ำเงินเข้ม
+
+        # ฟังก์ชันคำนวณ % สำหรับแต่ละส่วน
+        def autopct_format(pct):
+            return f"{pct:.1f}%" if pct > 0 else ""
+
+        # Plot Pie Chart
+        fig, ax = plt.subplots(figsize=(4, 4))
         fig.patch.set_facecolor('black')
+
+        if len(labels) > 1:
+            # แสดงป้ายกำกับและเปอร์เซ็นต์หากมีหลายส่วน
+            wedges, texts, autotexts = ax.pie(
+                sizes, labels=labels, autopct=autopct_format, startangle=90, colors=colors, 
+                textprops={'color': 'white', 'fontsize': 12}
+            )
+            plt.setp(autotexts, size=12, weight="bold")
+        else:
+            # แสดงข้อความตรงกลางกรณีมีข้อมูลเดียว
+            ax.pie(sizes, labels=None, startangle=90, colors=colors)
+            center_label = labels[0]
+            center_percent = f"{sizes[0] / sum(sizes) * 100:.1f}%"
+            plt.text(0, 0, f"{center_percent}\n{center_label}", ha='center', va='center', fontsize=14, color='white')
+
+        ax.axis('equal')  # ให้ Pie Chart เป็นวงกลม
         st.pyplot(fig)
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
     # Image Navigation
     st.markdown("---")
