@@ -44,7 +44,7 @@ except Exception as e:
 # Process Uploaded Images
 if uploaded_files:
     st.markdown("### Processing Results:")
-    results_count = {'True': 0, 'False': 0, 'Unknown': 0}  # เพิ่ม Unknown
+    results_count = {'True': 0, 'False': 0, 'Unknown': 0}
     results_data = []
     detected_images = []
 
@@ -61,7 +61,7 @@ if uploaded_files:
             type_count = ''
             type_predict = ''
             
-            detections = results.pandas().xyxy[0]  # จะแสดงผลเป็น DataFrame
+            detections = results.pandas().xyxy[0]
             for index, row in detections.iterrows():
                 class_name = row['name']
                 conf_score = row['confidence']
@@ -76,17 +76,10 @@ if uploaded_files:
                 elif class_name == 'false':
                     count_false += conf_score
 
-                # st.write(f"Detected: {class_name} with confidence {conf_score:.2f}")
-                # print("-----------------true---------",count_true, "------------------------------")
-                # print("-----------------false---------",count_false, "------------------------------")
-            
-            # Collect statistics
             true_count = sum(result[-1] > confidence_threshold for result in results.pred[0])
             false_count = len(results.pred[0]) - true_count
             confidence_avg = results.pred[0][:, -1].mean().item() if len(results.pred[0]) > 0 else 0
         
-            # Check for Unknown condition
-
             if count_true and count_false != 0:
                 results_count['Unknown'] += 1
                 type_count += 'Unknow'
@@ -103,6 +96,7 @@ if uploaded_files:
                 type_predict += class_name
 
             results_data.append({
+                "Index": idx + 1,
                 "Image Name": uploaded_file.name,
                 "True": count_true,
                 "False": count_false,
@@ -119,9 +113,8 @@ if uploaded_files:
     # Display DataFrame of results
     st.write("### Detection Summary:")
     df_results = pd.DataFrame(results_data)
-    st.dataframe(df_results)
 
-    # Display Pie Chart
+        # Display Pie Chart
     if any(results_count.values()):
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
 
@@ -173,6 +166,58 @@ if uploaded_files:
         st.pyplot(fig)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # Pagination controls
+    st.write("### Table Detection:")
+    items_per_page = st.radio("Rows per page:", [10, "Show All"], index=0, horizontal=True)
+
+    if items_per_page == "Show All":
+        items_per_page = len(df_results)
+
+    total_pages = (len(df_results) - 1) // items_per_page + 1
+
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 1
+
+    def go_to_page(page):
+        st.session_state.current_page = page
+
+    current_page = st.session_state.current_page
+    start_idx = (current_page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+
+    # Display current page of the table
+    page_results = df_results.iloc[start_idx:end_idx]
+    
+    def view_image(index):
+        st.session_state.current_index = index - 1
+
+    for i, row in page_results.iterrows():
+        col1, col2, col3, col4, col5, col6 = st.columns([1, 3, 2, 2, 2, 1])
+        col1.write(row['Index'])
+        col2.write(row['Image Name'])
+        col3.write(f"True: {row['True']:.2f}")
+        col4.write(f"False: {row['False']:.2f}")
+        col5.write(f"Type: {row['Type']}")
+        if col6.button("View", key=f"view_{row['Index']}"):
+            view_image(row['Index'])
+
+    # Pagination controls
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col1:
+        if current_page > 1:
+            if st.button("Previous Page", key="prev_page"):
+                go_to_page(current_page - 1)
+                st.rerun()  # Force rerun to update the page
+
+    with col2:
+        st.write(f"Page {current_page} of {total_pages}")
+
+    with col3:
+        if current_page < total_pages:
+            if st.button("Next Page", key="next_page"):
+                go_to_page(current_page + 1)
+                st.rerun()  # Force rerun to update the page
 
     # Image Navigation
     st.markdown("---")
@@ -190,15 +235,13 @@ if uploaded_files:
             st.session_state.current_index -= 1
 
     current_image = detected_images[st.session_state.current_index]
-    # st.image(current_image, caption=f"Processed: {uploaded_files[st.session_state.current_index].name}", use_column_width=True)
     st.image(current_image, caption=f"Processed: {uploaded_files[st.session_state.current_index].name}", use_container_width=True)
-
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        st.button("Previous", on_click=prev_image)
+        st.button("Previous", on_click=prev_image, key="prev_image")
     with col3:
-        st.button("Next", on_click=next_image)
+        st.button("Next", on_click=next_image, key="next_image")
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: your.email@example.com</div>", unsafe_allow_html=True)

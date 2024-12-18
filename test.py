@@ -55,34 +55,59 @@ if uploaded_files:
         try:
             original_image = Image.open(uploaded_file)
             results = model(original_image)
+
+            count_true = 0
+            count_false = 0
+            type_count = ''
+            type_predict = ''
             
             detections = results.pandas().xyxy[0]  # จะแสดงผลเป็น DataFrame
             for index, row in detections.iterrows():
                 class_name = row['name']
                 conf_score = row['confidence']
-                st.write(f"Detected: {class_name} with confidence {conf_score:.2f}")
-                print("------------------------------",conf_score, "------------------------------")
+
+                if class_name == 'true' and class_name == 'false':
+                    count_true += conf_score
+                    count_false += conf_score
+
+                elif class_name == 'true':
+                    count_true += conf_score
+                
+                elif class_name == 'false':
+                    count_false += conf_score
+
+                # st.write(f"Detected: {class_name} with confidence {conf_score:.2f}")
+                # print("-----------------true---------",count_true, "------------------------------")
+                # print("-----------------false---------",count_false, "------------------------------")
             
             # Collect statistics
             true_count = sum(result[-1] > confidence_threshold for result in results.pred[0])
             false_count = len(results.pred[0]) - true_count
             confidence_avg = results.pred[0][:, -1].mean().item() if len(results.pred[0]) > 0 else 0
-
-            print("-------------------------",results)
-
         
             # Check for Unknown condition
-            if confidence_avg == 0.5:
+
+            if count_true and count_false != 0:
                 results_count['Unknown'] += 1
-            else:
+                type_count += 'Unknow'
+                type_predict += class_name
+
+            elif true_count > 0:
                 results_count['True'] += true_count
+                type_count += 'True'
+                type_predict += class_name
+
+            elif false_count > 0:    
                 results_count['False'] += false_count
+                type_count += 'False'
+                type_predict += class_name
 
             results_data.append({
                 "Image Name": uploaded_file.name,
-                "True": true_count,
-                "False": false_count,
-                "Confidence Avg": confidence_avg
+                "True": count_true,
+                "False": count_false,
+                "Type_predict": type_predict,
+                "Type": type_count
             })
 
             detected_images.append(Image.fromarray(results.render()[0]))
