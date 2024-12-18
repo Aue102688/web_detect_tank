@@ -68,7 +68,7 @@ if uploaded_files:
                     class_name = row['name']
                     conf_score = row['confidence']
                     st.write(f"Detected: {class_name} with confidence {conf_score:.2f}")
-
+                    print("------------------------------",conf_score, "------------------------------")
                     # หากพบการตรวจจับที่ตรงกับเงื่อนไข (เช่น class_name == "Complied")
                     if class_name == "Complied":
                         folder_name = "Complied_images"
