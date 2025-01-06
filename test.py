@@ -31,7 +31,7 @@ branch_code = st.text_input("Branch Code:")
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 # Load YOLOv5 Model
-model_path = r'C:\\selenium_web\\yolov5\\best_e100_b16_s.pt'
+model_path = r'C:\selenium_web\web_detect_tank\best_e100_b16_s.pt'
 
 try:
     st.sidebar.write("Loading YOLOv5 model...")
