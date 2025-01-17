@@ -3,6 +3,7 @@ from PIL import Image
 import concurrent.futures
 from ultralytics import YOLO
 import numpy as np
+import pandas as pd
 
 # Custom CSS
 # st.markdown("""
@@ -29,7 +30,7 @@ st.markdown("<h1 style='text-align: center;'>Water Preventive Maintenance Classi
 
 # Sidebar for settings
 st.sidebar.title("Settings")
-confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.5, 0.05)
+confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.2, 0.05)
 st.sidebar.write("Adjust the confidence level for object detection.")
 
 # Input fields
@@ -52,6 +53,10 @@ try:
 except Exception as e:
     st.sidebar.error(f"Error loading model: {e}")
     st.stop()
+
+# Initialize dataframe
+columns = ["Filename", "Type", "Confidence"]
+dataframe = pd.DataFrame(columns=columns)
 
 # Process Uploaded Images
 if uploaded_files:
@@ -77,11 +82,31 @@ if uploaded_files:
 
             # Prepare detection info
             detection_info = []
+            types_detected = set()
+            max_confidence = 0
+            main_type = ""
+
             if detections is not None:
                 for box in detections:
                     class_name = results[0].names[int(box.cls)]  # Get class name
                     confidence = box.conf.item() * 100  # Get confidence as percentage
                     detection_info.append((class_name, confidence))
+                    types_detected.add(class_name)
+
+                    if confidence > max_confidence:
+                        max_confidence = confidence
+                        main_type = class_name
+
+            # Determine final type based on detection rules
+            if "correct" in types_detected and len(types_detected) > 1:
+                final_type = "check"
+            elif len(types_detected) > 1:
+                final_type = main_type
+            else:
+                final_type = main_type if main_type else "undetected"
+
+            # Update dataframe
+            dataframe.loc[len(dataframe)] = [uploaded_file.name, final_type, max_confidence]
 
             return detected_image, detection_info
         except Exception as e:
@@ -92,31 +117,49 @@ if uploaded_files:
     with concurrent.futures.ThreadPoolExecutor() as executor:
         results = list(executor.map(process_image, uploaded_files))
 
+    # Display dataframe
+    st.markdown("### Detection Summary:")
+    st.dataframe(dataframe)
+
     # Display Uploaded and Detected Images
     for idx, (uploaded_file, (detected_image, detection_info)) in enumerate(zip(uploaded_files, results)):
         if detected_image:
-            st.markdown("#### Detected Image: {uploaded_file.name}")
-            st.image(detected_image, use_container_width=True)
+            st.markdown(f"#### Detected Image: {uploaded_file.name}")
+            st.image(uploaded_file, use_container_width=True)
+            # st.image(detected_image, use_container_width=True)
 
-            # Display detection information
-            if detection_info:
-                for class_name, confidence in detection_info:
-                    additional_text = "Your PM work image meets the standard."
-                    if class_name == "Incomplied":
-                        additional_text = "Your PM work image doesn't meet the standard.<br>"
-                        additional_text += "Please check for cleanliness, there should be no residual water and no sediment."
+            # Get classification and confidence from DataFrame
+            file_data = dataframe[dataframe["Filename"] == uploaded_file.name]
+            if not file_data.empty:
+                final_type = file_data.iloc[0]["Type"]
+                max_confidence = file_data.iloc[0]["Confidence"]
 
-                    st.markdown(
+                # Define additional text based on type
+                additional_text = "Your PM work image meets the standard."
+                if final_type == "Incomplied":
+                    additional_text = (
+                        "Your PM work image doesn't meet the standard.<br>"
+                        "Please check for cleanliness, there should be no residual water and no sediment."
+                    )
+                elif final_type == "check":
+                    additional_text = (
+                        "Your PM work image is under review. Multiple types detected."
+                    )
+                elif final_type == "undetected":
+                    additional_text = (
+                        "No detectable objects found in the image. Please recheck the image."
+                    )
+                st.markdown(
                     f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
-                    f'<h2 style="color: black">{class_name}</h2>'
-                    f'<h3 style="color: black">score: {confidence:.2f}%</h3>'
+                    f'<h2 style="color: black">{final_type}</h2>'
+                    # f'<h3 style="color: black">score: {max_confidence:.2f}%</h3>'
                     f'<p style="color: black">{additional_text}</p>'
                     f'</div>'
                     f'<h1></h1>',
                     unsafe_allow_html=True
-        )
+                )
             else:
-                st.write("No detections found.")
+                st.write("No detections found in the DataFrame.")
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: your.email@example.com</div>", unsafe_allow_html=True)
