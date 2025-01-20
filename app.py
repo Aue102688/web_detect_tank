@@ -89,13 +89,19 @@ def process_image(uploaded_file):
                     max_confidence = confidence
                     main_type = class_name
 
-        # Determine final type based on detection rules
-        if "correct" in types_detected and len(types_detected) > 1:
+        # Define final type based on conditions
+        if "correct" in types_detected and "incorrect" in types_detected and "fail" in types_detected:
+            # Check if any class has confidence less than 90%
+            if any(conf < 90 for _, conf in detection_info):
+                final_type = "check"
+            else:
+                final_type = main_type
+        elif "correct" in types_detected and len(types_detected) > 1:
             final_type = "check"
         elif len(types_detected) > 1:
             final_type = main_type
         else:
-            final_type = main_type if main_type else "undetected"
+            final_type = main_type if main_type else "check"
 
         # Update dataframe with filename, class prediction, and confidence
         dataframe = get_dataframe()
@@ -182,6 +188,7 @@ elif view_option == "Show Images":
                 if detected_image:
                     st.markdown(f"#### Detected Image: {uploaded_file.name}")
                     st.image(uploaded_file, use_container_width=True)
+                    # st.image(detected_image, use_container_width=True)
 
                     # Get classification and confidence from DataFrame
                     dataframe = get_dataframe()
