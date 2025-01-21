@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
+import subprocess
+import os
+import sys
 
 # Custom CSS for input styles
 st.markdown(
@@ -267,7 +270,49 @@ if uploaded_files:
                         )
                     else:
                         st.write("No detections found in the DataFrame.")
-            
+
+# RPA Button to trigger RPA process and load images
+if st.button("RPA"):
+    try:
+        # แจ้งให้ผู้ใช้ทราบว่า RPA กำลังทำงาน
+        st.sidebar.write("Running RPA script to fetch images...")
+
+        # เรียกใช้ RPA script (รอจนกระทั่งเสร็จสิ้น)
+        result = subprocess.run(["python", "test_1.py"], capture_output=True, text=True)
+
+        # ตรวจสอบผลลัพธ์จาก RPA script
+        if result.returncode == 0:
+            st.sidebar.success("RPA script completed successfully!")
+
+            # ตรวจสอบว่าโฟลเดอร์ที่บันทึกรูปภาพมีอยู่จริง
+            image_folder = "download_images"
+            if not os.path.exists(image_folder):
+                st.error(f"The folder '{image_folder}' does not exist.")
+            else:
+                # โหลดไฟล์ภาพจากโฟลเดอร์ที่ RPA script บันทึกไว้
+                image_files = [f for f in os.listdir(image_folder) if f.endswith(".jpg")]
+
+                if image_files:
+                    for image_file in image_files:
+                        image_path = os.path.join(image_folder, image_file)
+
+                        # เปิดไฟล์ภาพและประมวลผล
+                        with open(image_path, "rb") as img_file:
+                            detected_image, detection_info = process_image(img_file)
+
+                            if detected_image:
+                                st.markdown(f"#### Detected Image: {image_file}")
+                                st.image(image_path, use_container_width=True)
+                else:
+                    st.error(f"No images were downloaded by the RPA script in folder '{image_folder}'.")
+        else:
+            st.error(f"RPA script failed. Error: {result.stderr}")
+
+    except subprocess.CalledProcessError as e:
+        st.error(f"Error running RPA: {e}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
+
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: satit102688@gmail.com</div>", unsafe_allow_html=True)
