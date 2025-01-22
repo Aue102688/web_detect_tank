@@ -8,6 +8,8 @@ import subprocess
 import os
 import sys
 
+import datetime
+
 # Custom CSS for input styles
 st.markdown(
     '''
@@ -31,6 +33,29 @@ st.sidebar.write("Adjust settings as needed.")
 employee_name = st.text_input("Employee Name:")
 branch_code = st.text_input("Branch Code:")
 
+# Date
+
+def get_row_and_column(selected_date):
+    # หาวันในสัปดาห์ (0=Sunday, 6=Saturday) เมื่อเริ่มต้นที่วันอาทิตย์
+    weekday = selected_date.weekday()  # Monday=0, Sunday=6
+    weekday = (weekday + 1) % 7  # เปลี่ยนให้ Sunday = 0, Monday = 1, ...
+
+    # คำนวณแถวและคอลัมน์
+    row = (weekday) // 7 + 1  # แถว
+    column = (weekday % 7) + 1  # คอลัมน์ (1 ถึง 7)
+
+    return row, column
+
+# ให้ผู้ใช้เลือกวันที่จากปฏิทิน
+selected_date = st.date_input("เลือกวันที่", datetime.date.today())
+
+# คำนวณแถวและคอลัมน์จากวันที่ที่เลือก
+row, column = get_row_and_column(selected_date)
+
+# แสดงผลแถวและคอลัมน์
+st.write(f"คุณเลือกวันที่: {selected_date}")
+st.write(f"ตำแหน่งในตาราง: แถว {row}, คอลัมน์ {column}")
+
 # Upload Images
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -44,7 +69,7 @@ def get_dataframe():
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
+    model_path = r'C:\Users\Ratti\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
     return YOLO(model_path)
 
 try:
