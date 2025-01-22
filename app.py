@@ -353,15 +353,33 @@ if st.button("RPA"):
                         st.markdown(f"#### Detected Image: {result['Filename']}")
                         st.image(os.path.join(image_folder, result["Filename"]), use_container_width=True)
 
-                        # แสดงข้อมูลเพิ่มเติม
+                        # แสดงข้อมูลเพิ่มเติม (เฉพาะชื่อคลาส)
                         detection_text = "<br>".join(
-                            [f"{cls} ({conf:.2f}%)" for cls, conf in result["Detection Info"]]
+                            [f"{cls}" for cls, _ in result["Detection Info"]]
                         )
+                        # Define additional text based on type
+                        additional_text = "Your PM work image meets the standard."
+                        if detection_text == "Incomplied":
+                            additional_text = (
+                                "Your PM work image doesn't meet the standard.<br>"
+                                "Please check for cleanliness, there should be no residual water and no sediment."
+                            )
+                        elif detection_text == "check":
+                            additional_text = (
+                                "Your PM work image is under review. Multiple types detected."
+                            )
+                        elif detection_text == "undetected":
+                            additional_text = (
+                                "No detectable objects found in the image. Please recheck the image."
+                            )
                         st.markdown(
-                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0;">'
-                            f'<p style="color: black">{detection_text}</p>'
-                            f'</div>',
-                            unsafe_allow_html=True,
+                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
+                            f'<h2 style="color: black">{detection_text}</h2>'
+                            f'<p style="color: black">{additional_text}</p>'
+                            f'</div>'
+                            f'<br>'
+                            f'<br>',
+                            unsafe_allow_html=True
                         )
                 else:
                     st.error(f"No images were downloaded by the RPA script in folder '{image_folder}'.")
