@@ -271,6 +271,7 @@ if uploaded_files:
                     else:
                         st.write("No detections found in the DataFrame.")
 
+
 # RPA Button to trigger RPA process and load images
 if st.button("RPA"):
     try:
@@ -284,7 +285,6 @@ if st.button("RPA"):
         if result.returncode == 0:
             st.sidebar.success("RPA script completed successfully!")
 
-            # ตรวจสอบว่าโฟลเดอร์ที่บันทึกรูปภาพมีอยู่จริง
             image_folder = "download_images"
             if not os.path.exists(image_folder):
                 st.error(f"The folder '{image_folder}' does not exist.")
@@ -293,6 +293,7 @@ if st.button("RPA"):
                 image_files = [f for f in os.listdir(image_folder) if f.endswith(".jpg")]
 
                 if image_files:
+                    results = []  # เก็บข้อมูล detection ทั้งหมด
                     for image_file in image_files:
                         image_path = os.path.join(image_folder, image_file)
 
@@ -301,8 +302,67 @@ if st.button("RPA"):
                             detected_image, detection_info = process_image(img_file)
 
                             if detected_image:
-                                st.markdown(f"#### Detected Image: {image_file}")
-                                st.image(image_path, use_container_width=True)
+                                if isinstance(detection_info, list) and detection_info:  # ตรวจสอบว่ามีข้อมูล
+                                    results.append({
+                                        "Filename": image_file,
+                                        "Detection Info": detection_info
+                                    })
+
+                                else:
+                                    st.warning(f"Skipped invalid detection info for {image_file}: {detection_info}")
+
+                    # สร้าง DataFrame จากผลลัพธ์ทั้งหมด
+                    dataframe = get_dataframe()
+                    st.write("### Detection Results")
+                    st.dataframe(dataframe)
+
+                    # เพิ่มปุ่มดาวน์โหลด
+                    if not dataframe.empty:
+                        file_name_input = st.text_input("Enter file name to save (without extension):")
+                        if file_name_input:
+                            csv = dataframe.to_csv(index=False, header=True).encode("utf-8")
+                            st.download_button(
+                                label="Download Data as CSV",
+                                data=csv,
+                                file_name=f"{file_name_input}.csv",
+                                mime="text/csv",
+                            )
+                        else:
+                            st.error("Please enter a file name to save.")
+
+                    # แสดง Pie Chart
+                    if not dataframe.empty:
+                        st.write("### Classification Distribution")
+                        class_counts = dataframe["Class Predict"].value_counts()
+                        class_percentages = (class_counts / len(dataframe)) * 100
+
+                        fig, ax = plt.subplots()
+                        ax.pie(
+                            class_percentages,
+                            labels=class_counts.index,
+                            autopct="%1.1f%%",
+                            startangle=90,
+                            colors=plt.cm.Paired.colors,
+                        )
+                        ax.axis("equal")  # ทำให้กราฟวงกลมเป็นวงกลมจริง ๆ
+                        st.pyplot(fig)
+
+                    # แสดงภาพที่ประมวลผลแล้ว
+                    st.write("### Processed Images")
+                    for result in results:
+                        st.markdown(f"#### Detected Image: {result['Filename']}")
+                        st.image(os.path.join(image_folder, result["Filename"]), use_container_width=True)
+
+                        # แสดงข้อมูลเพิ่มเติม
+                        detection_text = "<br>".join(
+                            [f"{cls} ({conf:.2f}%)" for cls, conf in result["Detection Info"]]
+                        )
+                        st.markdown(
+                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0;">'
+                            f'<p style="color: black">{detection_text}</p>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
                 else:
                     st.error(f"No images were downloaded by the RPA script in folder '{image_folder}'.")
         else:
