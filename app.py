@@ -292,6 +292,8 @@ if st.button("RPA"):
                 # โหลดไฟล์ภาพจากโฟลเดอร์ที่ RPA script บันทึกไว้
                 image_files = [f for f in os.listdir(image_folder) if f.endswith(".jpg")]
 
+                st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
+
                 if image_files:
                     results = []  # เก็บข้อมูล detection ทั้งหมด
                     for image_file in image_files:
