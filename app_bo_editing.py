@@ -8,6 +8,8 @@ import subprocess
 import os
 import sys
 
+import datetime
+
 # Custom CSS for input styles
 st.markdown(
     '''
@@ -31,6 +33,29 @@ st.sidebar.write("Adjust settings as needed.")
 employee_name = st.text_input("Employee Name:")
 branch_code = st.text_input("Branch Code:")
 
+# Date
+
+def get_row_and_column(selected_date):
+    # หาวันในสัปดาห์ (0=Sunday, 6=Saturday) เมื่อเริ่มต้นที่วันอาทิตย์
+    weekday = selected_date.weekday()  # Monday=0, Sunday=6
+    weekday = (weekday + 1) % 7  # เปลี่ยนให้ Sunday = 0, Monday = 1, ...
+
+    # คำนวณแถวและคอลัมน์
+    row = (weekday) // 7 + 1  # แถว
+    column = (weekday % 7) + 1  # คอลัมน์ (1 ถึง 7)
+
+    return row, column
+
+# ให้ผู้ใช้เลือกวันที่จากปฏิทิน
+selected_date = st.date_input("เลือกวันที่", datetime.date.today())
+
+# คำนวณแถวและคอลัมน์จากวันที่ที่เลือก
+row, column = get_row_and_column(selected_date)
+
+# แสดงผลแถวและคอลัมน์
+st.write(f"คุณเลือกวันที่: {selected_date}")
+st.write(f"ตำแหน่งในตาราง: แถว {row}, คอลัมน์ {column}")
+
 # Upload Images
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -44,7 +69,7 @@ def get_dataframe():
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
+    model_path = r'C:\Users\Ratti\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
     return YOLO(model_path)
 
 try:
@@ -353,33 +378,15 @@ if st.button("RPA"):
                         st.markdown(f"#### Detected Image: {result['Filename']}")
                         st.image(os.path.join(image_folder, result["Filename"]), use_container_width=True)
 
-                        # แสดงข้อมูลเพิ่มเติม (เฉพาะชื่อคลาส)
+                        # แสดงข้อมูลเพิ่มเติม
                         detection_text = "<br>".join(
-                            [f"{cls}" for cls, _ in result["Detection Info"]]
+                            [f"{cls} ({conf:.2f}%)" for cls, conf in result["Detection Info"]]
                         )
-                        # Define additional text based on type
-                        additional_text = "Your PM work image meets the standard."
-                        if detection_text == "Incomplied":
-                            additional_text = (
-                                "Your PM work image doesn't meet the standard.<br>"
-                                "Please check for cleanliness, there should be no residual water and no sediment."
-                            )
-                        elif detection_text == "check":
-                            additional_text = (
-                                "Your PM work image is under review. Multiple types detected."
-                            )
-                        elif detection_text == "undetected":
-                            additional_text = (
-                                "No detectable objects found in the image. Please recheck the image."
-                            )
                         st.markdown(
-                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
-                            f'<h2 style="color: black">{detection_text}</h2>'
-                            f'<p style="color: black">{additional_text}</p>'
-                            f'</div>'
-                            f'<br>'
-                            f'<br>',
-                            unsafe_allow_html=True
+                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0;">'
+                            f'<p style="color: black">{detection_text}</p>'
+                            f'</div>',
+                            unsafe_allow_html=True,
                         )
                 else:
                     st.error(f"No images were downloaded by the RPA script in folder '{image_folder}'.")
