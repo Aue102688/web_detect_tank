@@ -28,7 +28,7 @@ driver = webdriver.Chrome()
 # Function for calculate when user choose day
 def get_day_position(day, start_day_of_week):
 
-    # Calculate Position
+    # Calculate Position    
     if day < 7:
         tr = day
         td = start_day_of_week   # column
@@ -78,7 +78,7 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_put = int(sys.argv[4])
+    year_put = 2024
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -93,7 +93,8 @@ try:
         year_select.click()
         time.sleep(2)
 
-    month_put = int(sys.argv[3])
+    month_put = 6
+
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
     month_select.click()
@@ -146,10 +147,10 @@ try:
     time.sleep(3)
 
     #   Edit day here !!
-    day = int(sys.argv[1])
+    day = 30
     #   Edit start day here !!
     # start_day_of_week = int(sys.argv[2])
-    start_day_of_week = int(sys.argv[2])
+    start_day_of_week = 1
 
     # Calculate position of day
     tr, td = get_day_position(day, start_day_of_week)

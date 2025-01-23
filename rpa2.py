@@ -17,19 +17,12 @@ import shutil
 import urllib.parse
 import math
 import sys
+import io
 
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 # Setting WebDriver to chrome
 driver = webdriver.Chrome()
-
-# Function for calculate when user choose day
-def get_day_position(day, start_day_of_week):
-
-    # Calculate Position
-    day_index = day + start_day_of_week - 2  # index start 0
-    tr = day_index // 7 + 1     # row
-    td = day_index % 7 + 1      # column
-
-    return tr, td
 
 # Function for calculate page for using max_pages
 def get_max_pages():
@@ -85,6 +78,7 @@ try:
         time.sleep(2)
 
     month_put = int(sys.argv[3])
+
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
     month_select.click()
@@ -136,14 +130,15 @@ try:
     search_button.click()
     time.sleep(3)
 
-    #   Edit day here !!
-    day = int(sys.argv[1])
-    #   Edit start day here !!
+    # #   Edit day here !!
+    # day = int(sys.argv[1])
+    # #   Edit start day here !!
+    # # start_day_of_week = int(sys.argv[2])
     # start_day_of_week = int(sys.argv[2])
-    start_day_of_week = int(sys.argv[2])
 
-    # Calculate position of day
-    tr, td = get_day_position(day, start_day_of_week)
+    tr = int(sys.argv[1])
+    td = int(sys.argv[2])
+
 
     day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
     driver.find_element(By.XPATH, day_xpath).click()
