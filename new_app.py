@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import subprocess
 import os
 import sys
+import datetime
 
 # Custom CSS for input styles
 st.markdown(
@@ -27,34 +28,65 @@ st.markdown("<h1 style='text-align: center;'>Water Preventive Maintenance Classi
 st.sidebar.title("Settings")
 st.sidebar.write("Adjust settings as needed.")
 
-# Input fields
-employee_name = st.text_input("Employee Name:")
-branch_code = st.text_input("Branch Code:")
+# # Input fields
+# employee_name = st.text_input("Employee Name:")
+# branch_code = st.text_input("Branch Code:")
 
-# Add Date Input Fields
-st.sidebar.header("Input Date Information")
-date = st.sidebar.number_input("Day (1-31):", min_value=1, max_value=31, value=1)
-day_of_week = st.sidebar.selectbox(
-    "Day of the Week:",
-    options=["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    format_func=lambda x: x,
-    index=0
-)
-month = st.sidebar.number_input("Month (1-12):", min_value=1, max_value=12, value=1)
-year = st.sidebar.number_input("Year:", min_value=1900, max_value=2100, value=2023)
 
-# Convert day_of_week to numeric
-week_day_mapping = {"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}
-day_of_week_numeric = week_day_mapping[day_of_week]
+# Date
+
+def get_column_day(selected_date):
+    # หาวันในสัปดาห์ (0=Sunday, 6=Saturday) เมื่อเริ่มต้นที่วันอาทิตย์
+    weekday = selected_date.weekday()  # Monday=0, Sunday=6
+    weekday = (weekday + 1) % 7  # เปลี่ยนให้ Sunday = 0, Monday = 1, ...
+    column = (weekday % 7) + 1  # คอลัมน์ (1 ถึง 7)x
+    day = selected_date.day 
+
+    return  day, column
+
+def get_row_day(day, column, selected_date):
+    """
+    คำนวณ row ของวันที่ในปฏิทิน โดยอิงจาก day, column และตำแหน่ง column ของวันที่ 1 ของเดือน
+    :param day: วันที่ (1-31)
+    :param column: คอลัมน์ของวันในสัปดาห์ (1-7, Sunday=1)
+    :param selected_date: วันที่ที่เลือก
+    :return: row ที่วันที่นั้นอยู่ในปฏิทิน
+    """
+    # หา column ของวันที่ 1 ของเดือน
+    first_day_of_month = selected_date.replace(day=1)
+    first_day_column = ((first_day_of_month.weekday() + 1) % 7) + 1  # เปลี่ยนให้ Sunday = 1
+
+    # คำนวณตำแหน่งวันในตาราง โดยอิงจากวันที่ 1 เป็นจุดเริ่มต้น
+    day_position = day + (first_day_column - 1)
+
+    # แถวในปฏิทินเริ่มที่ 1 (ทุก 7 วันคือแถวใหม่)
+    row = (day_position - 1) // 7 + 1
+    
+    return row
+
+
+# ให้ผู้ใช้เลือกวันที่จากปฏิทิน
+selected_date = st.date_input("เลือกวันที่", datetime.date.today())
+
+# คำนวณแถวและคอลัมน์จากวันที่ที่เลือก
+day, column = get_column_day(selected_date)
+row = get_row_day(day, column, selected_date)
+
+# แสดงผลแถวและคอลัมน์
+st.write(f"คุณเลือกวันที่: {selected_date}")
+# st.write(f"ตำแหน่งในตาราง: วันที่ {day}, แถวที่ {row}, คอลัมน์ {column}")
 
 # Upload Images
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
+# ตรวจสอบและสร้าง dataframe ใน session_state ถ้ายังไม่มี
 if "dataframe" not in st.session_state:
     st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
 
-
+# Helper function สำหรับการดึง dataframe
 def get_dataframe():
+    if "dataframe" not in st.session_state:
+        st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
     return st.session_state["dataframe"]
 
 # Load YOLOv8 Model only once
@@ -217,32 +249,40 @@ if uploaded_files:
                             max_confidence = file_data.iloc[0]["Confidence"]
 
                             # Define additional text based on type
-                            additional_text = "Your PM work image meets the standard."
-                            if final_type == "Incomplied":
-                                additional_text = (
-                                    "Your PM work image doesn't meet the standard.<br>"
-                                    "Please check for cleanliness, there should be no residual water and no sediment."
-                                )
-                            elif final_type == "check":
-                                additional_text = (
-                                    "Your PM work image is under review. Multiple types detected."
-                                )
-                            elif final_type == "undetected":
-                                additional_text = (
-                                    "No detectable objects found in the image. Please recheck the image."
-                                )
-                            st.markdown(
-                                f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
-                                f'<h2 style="color: black">{final_type}</h2>'
-                                f'<p style="color: black">{additional_text}</p>'
-                                f'</div>'
-                                f'<br>'
-                                f'<br>',  # เพิ่มช่องว่างหลัง div
-                                unsafe_allow_html=True
+                        if final_type == "correct":
+                            additional_text = (
+                                "Your PM work image meets the standard."
                             )
+                        elif final_type == "check":
+                            additional_text = (
+                                "Your PM work image is under review. Multiple types detected."
+                            )
+                        elif final_type == "incorrect":
+                            additional_text = (
+                                "Your PM work image doesn't meet the standard.<br>"
+                                "Please check for cleanliness, there should be no residual water and no sediment."
+                            )
+                        elif final_type == "fail":
+                            additional_text = (
+                                "Your PM work image doesn't meet the standard.<br>"
+                                "Please check for cleanliness, there should be no residual water and no sediment."
+                            )
+                        elif final_type == "undetected":
+                            additional_text = (
+                                "No detectable objects found in the image. Please recheck the image."
+                            )
+                        st.markdown(
+                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
+                            f'<h2 style="color: black">{final_type}</h2>'
+                            f'<p style="color: black">{additional_text}</p>'
+                            f'</div>'
+                            f'<br>' 
+                            f'<br>',  # เพิ่มช่องว่างหลัง div
+                            unsafe_allow_html=True
+                        )
 
-                        else:
-                            st.write("No detections found in the DataFrame.")
+                    else:
+                        st.write("No detections found in the DataFrame.")
             else:
                 # Process and display the selected image
                 selected_image_name = st.selectbox("Select an Image to View:", [file.name for file in uploaded_files])
@@ -263,8 +303,11 @@ if uploaded_files:
                         max_confidence = file_data.iloc[0]["Confidence"]
 
                         # Define additional text based on type
-                        additional_text = "Your PM work image meets the standard."
-                        if final_type == "Incomplied":
+                        if final_type == "correct":
+                            additional_text = (
+                                "Your PM work image meets the standard."
+                            )
+                        elif final_type == "incorrect" or "fail":
                             additional_text = (
                                 "Your PM work image doesn't meet the standard.<br>"
                                 "Please check for cleanliness, there should be no residual water and no sediment."
@@ -288,6 +331,12 @@ if uploaded_files:
                         st.write("No detections found in the DataFrame.")
 
 
+# ตรวจสอบว่า DataFrame และผลลัพธ์ถูกเก็บใน session_state หรือไม่
+if "rpa_dataframe" not in st.session_state:
+    st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
+if "rpa_results" not in st.session_state:
+    st.session_state["rpa_results"] = []  # เก็บผลลัพธ์จากการประมวลผลภาพ
+
 # RPA Button to trigger RPA process and load images
 if st.button("RPA"):
     try:
@@ -295,116 +344,73 @@ if st.button("RPA"):
         st.sidebar.write("Running RPA script to fetch images...")
 
         # เรียกใช้ RPA script (รอจนกระทั่งเสร็จสิ้น)
-        result = subprocess.run([
-            "python", "test_rpa.py", str(date), str(day_of_week_numeric), str(month), str(year)
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                "python", 
+                "test_1.py", 
+                str(row), 
+                str(column), 
+                str(selected_date.month), 
+                str(selected_date.year)
+            ],
+            capture_output=True, 
+            text=True
+        )
 
-        print(result)
-        
         # ตรวจสอบผลลัพธ์จาก RPA script
         if result.returncode == 0:
             st.sidebar.success("RPA script completed successfully!")
 
-            image_folder = "download_images"
+            # ระบุ path ของโฟลเดอร์ download_images
+            script_dir = os.path.dirname(os.path.abspath(__file__))  # หา path ปัจจุบันของสคริปต์
+            image_folder = os.path.join(script_dir, "download_images/")
+            
             if not os.path.exists(image_folder):
                 st.error(f"The folder '{image_folder}' does not exist.")
             else:
-                # โหลดไฟล์ภาพจากโฟลเดอร์ที่ RPA script บันทึกไว้
-                image_files = [f for f in os.listdir(image_folder) if f.endswith(".jpg")]
+                # โหลดไฟล์ภาพจากโฟลเดอร์ย่อยทั้งหมด
+                image_files = []
+                for root, _, files in os.walk(image_folder):  # ใช้ os.walk เพื่อเข้าถึงโฟลเดอร์ย่อย
+                    for file in files:
+                        if file.endswith(".jpg"):  # กรองเฉพาะไฟล์ภาพที่ลงท้ายด้วย .jpg
+                            image_files.append(os.path.join(root, file))  # เก็บ path แบบเต็มของไฟล์
 
-                st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
+                # สร้าง DataFrame สำหรับผลลัพธ์
+                st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
+                st.session_state["rpa_results"] = []  # ล้างผลลัพธ์ก่อนเริ่มใหม่
 
                 if image_files:
-                    results = []  # เก็บข้อมูล detection ทั้งหมด
                     for image_file in image_files:
-                        image_path = os.path.join(image_folder, image_file)
+                        # ดึงชื่อไฟล์และ code จาก path
+                        filename = os.path.splitext(os.path.basename(image_file))[0]  # ดึงชื่อไฟล์โดยไม่มี path และ .jpg
+                        code = os.path.basename(os.path.dirname(image_file))  # ดึงชื่อโฟลเดอร์ (แหล่งที่มาของรูป)
 
                         # เปิดไฟล์ภาพและประมวลผล
-                        with open(image_path, "rb") as img_file:
+                        with open(image_file, "rb") as img_file:
                             detected_image, detection_info = process_image(img_file)
 
                             if detected_image:
                                 if isinstance(detection_info, list) and detection_info:  # ตรวจสอบว่ามีข้อมูล
-                                    results.append({
-                                        "Filename": image_file,
+                                    st.session_state["rpa_results"].append({
+                                        "Filename": filename,  # เก็บเฉพาะชื่อไฟล์
+                                        "Code": code,  # เก็บแหล่งที่มาของรูป
+                                        "Image File": image_file,  # เก็บ path เต็มของรูปภาพ
                                         "Detection Info": detection_info
                                     })
 
-                                else:
-                                    st.warning(f"Skipped invalid detection info for {image_file}: {detection_info}")
+                                    for cls, confidence in detection_info:
+                                        new_row = pd.DataFrame([{
+                                            "Filename": filename,
+                                            "Code": code,
+                                            "Class Predict": cls,
+                                            "Confidence": confidence,
+                                        }])
 
-                    # สร้าง DataFrame จากผลลัพธ์ทั้งหมด
-                    dataframe = get_dataframe()
-                    st.write("### Detection Results")
-                    st.dataframe(dataframe)
+                                        st.session_state["rpa_dataframe"] = pd.concat(
+                                            [st.session_state["rpa_dataframe"], new_row], ignore_index=True
+                                        )
 
-                    # เพิ่มปุ่มดาวน์โหลด
-                    if not dataframe.empty:
-                        file_name_input = st.text_input("Enter file name to save (without extension):")
-                        if file_name_input:
-                            csv = dataframe.to_csv(index=False, header=True).encode("utf-8")
-                            st.download_button(
-                                label="Download Data as CSV",
-                                data=csv,
-                                file_name=f"{file_name_input}.csv",
-                                mime="text/csv",
-                            )
-                        else:
-                            st.error("Please enter a file name to save.")
-
-                    # แสดง Pie Chart
-                    if not dataframe.empty:
-                        st.write("### Classification Distribution")
-                        class_counts = dataframe["Class Predict"].value_counts()
-                        class_percentages = (class_counts / len(dataframe)) * 100
-
-                        fig, ax = plt.subplots()
-                        ax.pie(
-                            class_percentages,
-                            labels=class_counts.index,
-                            autopct="%1.1f%%",
-                            startangle=90,
-                            colors=plt.cm.Paired.colors,
-                        )
-                        ax.axis("equal")  # ทำให้กราฟวงกลมเป็นวงกลมจริง ๆ
-                        st.pyplot(fig)
-
-                    # แสดงภาพที่ประมวลผลแล้ว
-                    st.write("### Processed Images")
-                    for result in results:
-                        st.markdown(f"#### Detected Image: {result['Filename']}")
-                        st.image(os.path.join(image_folder, result["Filename"]), use_container_width=True)
-
-                        # แสดงข้อมูลเพิ่มเติม (เฉพาะชื่อคลาส)
-                        detection_text = "<br>".join(
-                            [f"{cls}" for cls, _ in result["Detection Info"]]
-                        )
-                        # Define additional text based on type
-                        additional_text = "Your PM work image meets the standard."
-                        if detection_text == "Incomplied":
-                            additional_text = (
-                                "Your PM work image doesn't meet the standard.<br>"
-                                "Please check for cleanliness, there should be no residual water and no sediment."
-                            )
-                        elif detection_text == "check":
-                            additional_text = (
-                                "Your PM work image is under review. Multiple types detected."
-                            )
-                        elif detection_text == "undetected":
-                            additional_text = (
-                                "No detectable objects found in the image. Please recheck the image."
-                            )
-                        st.markdown(
-                            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
-                            f'<h2 style="color: black">{detection_text}</h2>'
-                            f'<p style="color: black">{additional_text}</p>'
-                            f'</div>'
-                            f'<br>'
-                            f'<br>',
-                            unsafe_allow_html=True
-                        )
-                else:
-                    st.error(f"No images were downloaded by the RPA script in folder '{image_folder}'.")
+                st.write("RPA process completed. Data is ready for viewing.")
         else:
             st.error(f"RPA script failed. Error: {result.stderr}")
 
@@ -412,6 +418,84 @@ if st.button("RPA"):
         st.error(f"Error running RPA: {e}")
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
+
+# แสดงข้อมูลหากมีใน session_state
+if not st.session_state["rpa_dataframe"].empty:
+    st.write("# Detection Results")
+    dataframe = st.session_state["rpa_dataframe"]
+    st.dataframe(dataframe)
+    st.write("###")
+    if not dataframe.empty:
+        st.write("### Classification Distribution")
+        class_counts = dataframe["Class Predict"].value_counts()
+        class_percentages = (class_counts / len(dataframe)) * 100
+        fig, ax = plt.subplots()
+        ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
+        ax.axis("equal")  # Equal aspect ratio ensures the pie chart is a circle
+        st.pyplot(fig)
+    st.write("##")
+
+    # เพิ่มเมนู Dropdown เพื่อเลือกโฟลเดอร์
+    unique_codes = dataframe["Code"].unique()  # หา Code ที่ไม่ซ้ำ
+    selected_code = st.selectbox("Select Code:", unique_codes)
+
+    # กรอง DataFrame ตาม Code ที่เลือก
+    filtered_dataframe = dataframe[dataframe["Code"] == selected_code]
+
+    # รีเซ็ตดัชนีของ filtered_dataframe เพื่อให้เริ่มต้นที่ 1
+    filtered_dataframe = filtered_dataframe.reset_index(drop=True)
+    filtered_dataframe.index += 1  # ตั้งค่าให้ index เริ่มต้นที่ 1
+
+    # แสดงตารางเฉพาะข้อมูลของ Code ที่เลือก
+    st.write(f"## Detection Results for Code: {selected_code}")
+    st.dataframe(filtered_dataframe)
+
+    # แสดงภาพที่กรองแล้ว
+    st.write("### ")
+    st.write("## Processed Images for Selected Code")
+    filtered_results = [
+        result for result in st.session_state["rpa_results"] if result["Code"] == selected_code
+    ]
+
+    for result in filtered_results:
+        st.markdown(f"#### รหัสร้าน: {result['Code']}")
+        st.markdown(f"#### Detected Image: {result['Filename']}")
+        st.image(result['Image File'], use_container_width=True)
+
+        # แสดงข้อมูลเพิ่มเติม (เฉพาะชื่อคลาส)
+        detection_text = "<br>".join(
+            [f"{cls}" for cls, _ in result["Detection Info"]]
+        )
+        if detection_text == "correct":
+            additional_text = (
+                "Your PM work image meets the standard."
+            )
+        elif detection_text == "check":
+            additional_text = (
+                "Your PM work image is under review. Multiple types detected."
+            )
+        elif detection_text == "incorrect":
+            additional_text = (
+                "Your PM work image doesn't meet the standard.<br>"
+                "Please check for cleanliness, there should be no residual water and no sediment."
+            )
+        elif detection_text == "fail":
+            additional_text = (
+                "Your PM work image doesn't meet the standard.<br>"
+                "Please check for cleanliness, there should be no residual water and no sediment."
+            )
+        elif detection_text == "undetected":
+            additional_text = (
+                "No detectable objects found in the image. Please recheck the image."
+            )
+        st.markdown(
+            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
+            f'<h2 style="color: black">{detection_text}</h2>'
+            f'<p style="color: black">{additional_text}</p>'
+            f'</div>'
+            f'<br>' 
+            f'<br>', unsafe_allow_html=True
+        )
 
 
 # Footer

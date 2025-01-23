@@ -17,46 +17,39 @@ import shutil
 import urllib.parse
 import math
 import sys
-import sys
 import io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 
 # Setting WebDriver to chrome
 driver = webdriver.Chrome()
 
-# Function for calculate when user choose day
-def get_day_position(day, start_day_of_week):
-
-    # Calculate Position    
-    if day < 7:
-        tr = day
-        td = start_day_of_week   # column
-
-    elif day > 6 :
-        day_index = day + start_day_of_week - 2  # index start 0
-        tr = day_index // 7     # row
-        td = start_day_of_week   # column
-
-    return tr, td
 
 # Function for calculate page for using max_pages
 def get_max_pages():
+
     # Pull XPATH ALL ROWS
     rows_ALL = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/div')
     rows_text = rows_ALL.text.strip()  
+
     index_of_of = rows_text.find('of')
     rows_count = float(rows_text[index_of_of + 2:].strip())
+
     # Split Text back 'of'
     rows_count = float(rows_text.split('of')[-1].strip())  
+
     pages_pp = math.ceil(rows_count / 10)  
+    
     print(pages_pp)
+
     return pages_pp
 
 try:
     # Open Website
     driver.get("https://pm-rsm.cpretailink.co.th/login")
-    output_dir = "download_images"
+    # output_dir = "download_images"
     time.sleep(2)
 
     # Put Username & Password then Enter Login
@@ -78,7 +71,10 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_put = 2024
+    # Selecting Year
+    # Just 2023 - 2024 - 2025
+    #   Edit year here !!
+    year_put = int(sys.argv[4])
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -93,9 +89,12 @@ try:
         year_select.click()
         time.sleep(2)
 
-    month_put = 6
+    # Selecting month
+    #   Edit month here !!
+    month_put = int(sys.argv[3])
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
+
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
     month_select.click()
     time.sleep(2)
@@ -146,14 +145,8 @@ try:
     search_button.click()
     time.sleep(3)
 
-    #   Edit day here !!
-    day = 30
-    #   Edit start day here !!
-    # start_day_of_week = int(sys.argv[2])
-    start_day_of_week = 1
-
-    # Calculate position of day
-    tr, td = get_day_position(day, start_day_of_week)
+    tr = int(sys.argv[1])
+    td = int(sys.argv[2])
 
     day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
     driver.find_element(By.XPATH, day_xpath).click()
@@ -165,6 +158,7 @@ try:
     # Var current page
     current_page = 1
 
+    # Var next count & i for count click
     next_count = 1
     i = 1
 
@@ -189,6 +183,11 @@ try:
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip() 
+
+                                # Click 'ดูรูปภาพ'
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -196,6 +195,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
@@ -227,6 +231,10 @@ try:
                                 time.sleep(3)
 
                             elif row_index < 5:
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip()
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -234,6 +242,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
@@ -268,6 +281,10 @@ try:
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip()
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -275,6 +292,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
@@ -335,6 +357,10 @@ try:
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip()
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -342,6 +368,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
@@ -387,6 +418,10 @@ try:
                                 driver.execute_script("window.scrollTo(0, 0);")
                                 time.sleep(2)
 
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip()
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -394,6 +429,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
@@ -444,6 +484,10 @@ try:
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
+                                # Check 'รหัสร้าน' before Click
+                                number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                number_store_text = number_store.text.strip()
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
@@ -451,6 +495,11 @@ try:
 
                                 div_elements = driver.find_elements(By.XPATH, '/html/body/app-root/app-images/div/div')
                                 image_idx = 1
+
+                                # Create Folder of store before Downloading image
+                                # os.makedirs({number_store_text})
+                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"download_images/{number_store_text}"
 
                                 # Download Picture for keep in folder
                                 for div_element in div_elements:
