@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import subprocess
 import os
 import sys
+import datetime
 
 # Custom CSS for input styles
 st.markdown(
@@ -31,6 +32,50 @@ st.sidebar.write("Adjust settings as needed.")
 employee_name = st.text_input("Employee Name:")
 branch_code = st.text_input("Branch Code:")
 
+
+# Date
+
+def get_column_day(selected_date):
+    # หาวันในสัปดาห์ (0=Sunday, 6=Saturday) เมื่อเริ่มต้นที่วันอาทิตย์
+    weekday = selected_date.weekday()  # Monday=0, Sunday=6
+    weekday = (weekday + 1) % 7  # เปลี่ยนให้ Sunday = 0, Monday = 1, ...
+    column = (weekday % 7) + 1  # คอลัมน์ (1 ถึง 7)x
+    day = selected_date.day 
+
+    return  day, column
+
+def get_row_day(day, column, selected_date):
+    """
+    คำนวณ row ของวันที่ในปฏิทิน โดยอิงจาก day, column และตำแหน่ง column ของวันที่ 1 ของเดือน
+    :param day: วันที่ (1-31)
+    :param column: คอลัมน์ของวันในสัปดาห์ (1-7, Sunday=1)
+    :param selected_date: วันที่ที่เลือก
+    :return: row ที่วันที่นั้นอยู่ในปฏิทิน
+    """
+    # หา column ของวันที่ 1 ของเดือน
+    first_day_of_month = selected_date.replace(day=1)
+    first_day_column = ((first_day_of_month.weekday() + 1) % 7) + 1  # เปลี่ยนให้ Sunday = 1
+
+    # คำนวณตำแหน่งวันในตาราง โดยอิงจากวันที่ 1 เป็นจุดเริ่มต้น
+    day_position = day + (first_day_column - 1)
+
+    # แถวในปฏิทินเริ่มที่ 1 (ทุก 7 วันคือแถวใหม่)
+    row = (day_position - 1) // 7 + 1
+    
+    return row
+
+
+# ให้ผู้ใช้เลือกวันที่จากปฏิทิน
+selected_date = st.date_input("เลือกวันที่", datetime.date.today())
+
+# คำนวณแถวและคอลัมน์จากวันที่ที่เลือก
+day, column = get_column_day(selected_date)
+row = get_row_day(day, column, selected_date)
+
+# แสดงผลแถวและคอลัมน์
+st.write(f"คุณเลือกวันที่: {selected_date}")
+st.write(f"ตำแหน่งในตาราง: วันที่ {day}, แถวที่ {row}, คอลัมน์ {column}")
+
 # Upload Images
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
@@ -44,7 +89,7 @@ def get_dataframe():
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
+    model_path = r'C:\selenium_web\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
     return YOLO(model_path)
 
 try:
@@ -279,7 +324,18 @@ if st.button("RPA"):
         st.sidebar.write("Running RPA script to fetch images...")
 
         # เรียกใช้ RPA script (รอจนกระทั่งเสร็จสิ้น)
-        result = subprocess.run(["python", "test_1.py"], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                "python", 
+                "rpa2.py", 
+                str(row), 
+                str(column), 
+                str(selected_date.month), 
+                str(selected_date.year)
+            ],
+            capture_output=True, 
+            text=True
+        )
 
         # ตรวจสอบผลลัพธ์จาก RPA script
         if result.returncode == 0:
@@ -291,6 +347,8 @@ if st.button("RPA"):
             else:
                 # โหลดไฟล์ภาพจากโฟลเดอร์ที่ RPA script บันทึกไว้
                 image_files = [f for f in os.listdir(image_folder) if f.endswith(".jpg")]
+
+                st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
 
                 if image_files:
                     results = []  # เก็บข้อมูล detection ทั้งหมด
