@@ -164,6 +164,69 @@ def process_image(uploaded_file):
         st.error(f"Error processing image {uploaded_file.name}: {e}")
         return None, None
 
+# Function to process an image
+def process_image_RPA(uploaded_file):
+    try:
+        # Open the uploaded image
+        original_image = Image.open(uploaded_file).convert("RGB")
+
+        # Convert PIL Image to numpy array
+        image_array = np.array(original_image)
+
+        # Perform detection
+        results = model.predict(image_array)
+
+        # Extract detections and render image
+        detections = results[0].boxes  # Get bounding boxes
+        rendered_image = results[0].plot()  # Render detections on the image
+
+        # Convert rendered numpy array back to PIL Image
+        detected_image = Image.fromarray(rendered_image)
+
+        # Prepare detection info
+        detection_info = []
+        class_count = {}
+        max_confidence = {}
+
+        # Collect detected classes and their confidences
+        if detections is not None:
+            for box in detections:
+                class_name = results[0].names[int(box.cls)]  # Get class name
+                confidence = box.conf.item() * 100  # Confidence as percentage
+                detection_info.append((class_name, confidence))
+                
+                # Count occurrences of each class and store max confidence
+                if class_name not in class_count:
+                    class_count[class_name] = 0
+                    max_confidence[class_name] = 0
+                class_count[class_name] += 1
+                max_confidence[class_name] = max(max_confidence[class_name], confidence)
+
+        # Determine final class based on conditions
+        detected_classes = set(class_count.keys())
+        if "correct" in detected_classes and len(detected_classes) > 1:
+            # Condition 1: If "correct" exists with other classes
+            final_class = "check"
+            final_confidence = max_confidence["correct"]
+        elif "correct" in detected_classes and max_confidence["correct"] < 80:
+            # New Condition: If "correct" confidence is less than 80%
+            final_class = "check"
+            final_confidence = max_confidence["correct"]
+        elif len(detected_classes) > 1:
+            # Condition 2: If there is no "correct" but multiple classes exist
+            final_class = "incorrect"
+            final_confidence = max(max_confidence.values())
+        else:
+            # Condition 3: If all bounding boxes are the same class
+            final_class = list(detected_classes)[0]
+            final_confidence = max_confidence[final_class]
+
+        # Return processed data
+        return detected_image, [(final_class, final_confidence)]
+    except Exception as e:
+        st.error(f"Error processing image {uploaded_file.name}: {e}")
+        return None, None
+
 # Automatically process uploaded images
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -387,7 +450,7 @@ if st.button("RPA"):
 
                         # เปิดไฟล์ภาพและประมวลผล
                         with open(image_file, "rb") as img_file:
-                            detected_image, detection_info = process_image(img_file)
+                            detected_image, detection_info = process_image_RPA(img_file)
 
                             if detected_image:
                                 if isinstance(detection_info, list) and detection_info:  # ตรวจสอบว่ามีข้อมูล
@@ -421,41 +484,52 @@ if st.button("RPA"):
 
 # แสดงข้อมูลหากมีใน session_state
 if not st.session_state["rpa_dataframe"].empty:
-    st.write("# Detection Results")
-    dataframe = st.session_state["rpa_dataframe"]
-    st.dataframe(dataframe)
     st.write("###")
-    if not dataframe.empty:
-        st.write("### Classification Distribution")
-        class_counts = dataframe["Class Predict"].value_counts()
-        class_percentages = (class_counts / len(dataframe)) * 100
-        fig, ax = plt.subplots()
-        ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
-        ax.axis("equal")  # Equal aspect ratio ensures the pie chart is a circle
-        st.pyplot(fig)
-    st.write("##")
+    st.write("## Select Choice")
+    dataframe = st.session_state["rpa_dataframe"]
 
-    # เพิ่มเมนู Dropdown เพื่อเลือกโฟลเดอร์
+    # เพิ่มเมนู Dropdown พร้อมตัวเลือก "ALL"
     unique_codes = dataframe["Code"].unique()  # หา Code ที่ไม่ซ้ำ
-    selected_code = st.selectbox("Select Code:", unique_codes)
+    options = ["ALL"] + list(unique_codes)  # เพิ่ม "ALL" เป็นตัวเลือกแรก
+    selected_code = st.selectbox(" ",options)
 
-    # กรอง DataFrame ตาม Code ที่เลือก
-    filtered_dataframe = dataframe[dataframe["Code"] == selected_code]
+    # กรอง DataFrame ตามตัวเลือกใน Dropdown
+    if selected_code == "ALL":
+        filtered_dataframe = dataframe
+    else:
+        filtered_dataframe = dataframe[dataframe["Code"] == selected_code]
 
     # รีเซ็ตดัชนีของ filtered_dataframe เพื่อให้เริ่มต้นที่ 1
     filtered_dataframe = filtered_dataframe.reset_index(drop=True)
     filtered_dataframe.index += 1  # ตั้งค่าให้ index เริ่มต้นที่ 1
 
-    # แสดงตารางเฉพาะข้อมูลของ Code ที่เลือก
+    # แสดงตารางข้อมูลที่กรองแล้ว
     st.write(f"## Detection Results for Code: {selected_code}")
     st.dataframe(filtered_dataframe)
+    st.write("###")
+    
+    # Display Pie Chart
+    if not filtered_dataframe.empty:
+        st.write("## Classification Distribution")
+        
+        # ใช้ข้อมูลจาก filtered_dataframe แทน
+        class_counts = filtered_dataframe["Class Predict"].value_counts()
+        class_percentages = (class_counts / len(filtered_dataframe)) * 100
 
-    # แสดงภาพที่กรองแล้ว
-    st.write("### ")
-    st.write("## Processed Images for Selected Code")
-    filtered_results = [
-        result for result in st.session_state["rpa_results"] if result["Code"] == selected_code
-    ]
+        fig, ax = plt.subplots()
+        ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
+        ax.axis("equal")  # Equal aspect ratio ensures the pie chart is a circle
+        st.pyplot(fig)
+
+
+    # แสดงภาพและข้อมูลเพิ่มเติม (ถ้ามีผลลัพธ์ใน session_state["rpa_results"])
+    st.write("###")
+    st.write("## Processed Images:")
+    filtered_results = (
+        st.session_state["rpa_results"] if selected_code == "ALL" else [
+            result for result in st.session_state["rpa_results"] if result["Code"] == selected_code
+        ]
+    )
 
     for result in filtered_results:
         st.markdown(f"#### รหัสร้าน: {result['Code']}")
@@ -496,7 +570,6 @@ if not st.session_state["rpa_dataframe"].empty:
             f'<br>' 
             f'<br>', unsafe_allow_html=True
         )
-
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: satit102688@gmail.com</div>", unsafe_allow_html=True)
