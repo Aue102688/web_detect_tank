@@ -81,7 +81,8 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_put = int(sys.argv[4])
+    # year_put = int(sys.argv[4])
+    year_put = 2025
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -96,7 +97,8 @@ try:
         year_select.click()
         time.sleep(2)
 
-    month_put = int(sys.argv[3])
+    # month_put = int(sys.argv[3])
+    month_put = 1
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
@@ -150,8 +152,10 @@ try:
     time.sleep(3)
 
     # day rows & column 
-    tr = int(sys.argv[1])
-    td = int(sys.argv[2])
+    # tr = int(sys.argv[1])
+    # td = int(sys.argv[2])
+    tr = 3
+    td = 4
 
     day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
     driver.find_element(By.XPATH, day_xpath).click()
@@ -168,6 +172,7 @@ try:
 
     # max pages should fill by Total of pages that calculated
     max_pages = get_max_pages()
+    print(max_pages)
 
     # Not finish Page
     if current_page <= max_pages:
@@ -179,7 +184,7 @@ try:
             name_file_text = name_file.text.strip()
             
             url = 'https://pm-rsm.cpretailink.co.th/e-service-table/รายงานสรุปงาน_PM.csv'  
-            download_folder = "C:/Users/Ratti/TestAI_WaterTank/download_csv" 
+            download_folder = "download_csv" 
             filename = name_file_text
 
             # Split Date

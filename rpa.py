@@ -44,7 +44,7 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_select = driver.find_element(By.XPATH, '/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[3]/button/div[1]')
+    year_select = driver.find_element(By.XPATH, '/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[4]/button/div[1]')
     year_select.click()
     time.sleep(2)
 
@@ -97,7 +97,7 @@ try:
     time.sleep(3)
 
     # Select day
-    day_select = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[1]/td[4]/div/div[2]/div[1]/a')
+    day_select = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[1]/td[5]/div/div[2]/div[1]/a')
     day_select.click()
     time.sleep(3)
 

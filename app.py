@@ -5,9 +5,12 @@ import pandas as pd
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import subprocess
-import os
-import sys
 import datetime
+import torch
+import glob
+import sys
+import cv2
+import os
 
 # Custom CSS for input styles
 st.markdown(
@@ -28,72 +31,73 @@ st.markdown("<h1 style='text-align: center;'>Water Preventive Maintenance Classi
 st.sidebar.title("Settings")
 st.sidebar.write("Adjust settings as needed.")
 
-# # Input fields
-# employee_name = st.text_input("Employee Name:")
-# branch_code = st.text_input("Branch Code:")
-
+# ฟังก์ชันสำหรับโหลดข้อมูลจาก CSV
+def load_csv_data(selected_date):
+    folder_path = f"{selected_date}_csv"
+    if os.path.exists(folder_path):
+        csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
+        if csv_files:
+            file_path = os.path.join(folder_path, csv_files[0])  # ใช้ไฟล์ CSV แรกที่พบ
+            df = pd.read_csv(file_path)
+            df = df.drop(columns=["เวลาเริ่มงาน", "เวลาปิดงาน", "ข้อเสนอแนะ", "ข้อเสนอแนะเพิ่มเติม"], errors='ignore')
+            return df
+    st.error(f"No CSV file found in: {folder_path}")
+    return pd.DataFrame()
 
 # Date
-
 def get_column_day(selected_date):
-    # หาวันในสัปดาห์ (0=Sunday, 6=Saturday) เมื่อเริ่มต้นที่วันอาทิตย์
-    weekday = selected_date.weekday()  # Monday=0, Sunday=6
-    weekday = (weekday + 1) % 7  # เปลี่ยนให้ Sunday = 0, Monday = 1, ...
-    column = (weekday % 7) + 1  # คอลัมน์ (1 ถึง 7)x
-    day = selected_date.day 
-
-    return  day, column
+    weekday = selected_date.weekday()
+    weekday = (weekday + 1) % 7
+    column = (weekday % 7) + 1
+    day = selected_date.day
+    return day, column
 
 def get_row_day(day, column, selected_date):
-    """
-    คำนวณ row ของวันที่ในปฏิทิน โดยอิงจาก day, column และตำแหน่ง column ของวันที่ 1 ของเดือน
-    :param day: วันที่ (1-31)
-    :param column: คอลัมน์ของวันในสัปดาห์ (1-7, Sunday=1)
-    :param selected_date: วันที่ที่เลือก
-    :return: row ที่วันที่นั้นอยู่ในปฏิทิน
-    """
-    # หา column ของวันที่ 1 ของเดือน
     first_day_of_month = selected_date.replace(day=1)
-    first_day_column = ((first_day_of_month.weekday() + 1) % 7) + 1  # เปลี่ยนให้ Sunday = 1
-
-    # คำนวณตำแหน่งวันในตาราง โดยอิงจากวันที่ 1 เป็นจุดเริ่มต้น
+    first_day_column = ((first_day_of_month.weekday() + 1) % 7) + 1
     day_position = day + (first_day_column - 1)
-
-    # แถวในปฏิทินเริ่มที่ 1 (ทุก 7 วันคือแถวใหม่)
     row = (day_position - 1) // 7 + 1
-    
     return row
 
-
-# ให้ผู้ใช้เลือกวันที่จากปฏิทิน
 selected_date = st.date_input("เลือกวันที่", datetime.date.today())
-
-# คำนวณแถวและคอลัมน์จากวันที่ที่เลือก
+csv_data = load_csv_data(selected_date)
 day, column = get_column_day(selected_date)
 row = get_row_day(day, column, selected_date)
 
-# แสดงผลแถวและคอลัมน์
 st.write(f"คุณเลือกวันที่: {selected_date}")
 # st.write(f"ตำแหน่งในตาราง: วันที่ {day}, แถวที่ {row}, คอลัมน์ {column}")
+
+if "rpa_dataframe" not in st.session_state:
+    st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
+if "rpa_results" not in st.session_state:
+    st.session_state["rpa_results"] = []
+if "dataframe" not in st.session_state:
+    st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
+
+
+def reset_upload_state():
+    st.session_state["rpa_results"] = []
+    st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
+
+def reset_rpa_state():
+    st.session_state["rpa_results"] = []
+
 
 # Upload Images
 uploaded_files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-# ตรวจสอบและสร้าง dataframe ใน session_state ถ้ายังไม่มี
-if "dataframe" not in st.session_state:
-    st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
-
-# Helper function สำหรับการดึง dataframe
 def get_dataframe():
-    if "dataframe" not in st.session_state:
-        st.session_state["dataframe"] = pd.DataFrame(columns=["Filename", "Class Predict", "Confidence"])
     return st.session_state["dataframe"]
+
 
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\selenium_web\web_detect_tank\best_e100_b16_Beta.pt'  # Path to your YOLOv8 model
+    model_path = r'C:\selenium_web\web_detect_tank\best.pt'
     return YOLO(model_path)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 try:
     st.sidebar.write("Loading YOLOv8 model...")
@@ -109,18 +113,10 @@ def process_image(uploaded_file):
     try:
         # Open the uploaded image
         original_image = Image.open(uploaded_file).convert("RGB")
-
-        # Convert PIL Image to numpy array
         image_array = np.array(original_image)
-
-        # Perform detection
         results = model.predict(image_array)  # Removed conf=confidence_threshold
-
-        # Extract detections and render image
         detections = results[0].boxes  # Get bounding boxes
         rendered_image = results[0].plot()  # Render detections on the image
-
-        # Convert rendered numpy array back to PIL Image
         detected_image = Image.fromarray(rendered_image)
 
         # Prepare detection info
@@ -167,20 +163,13 @@ def process_image(uploaded_file):
 # Function to process an image
 def process_image_RPA(uploaded_file):
     try:
-        # Open the uploaded image
+        # Open the uploaded image and convert to RGB
         original_image = Image.open(uploaded_file).convert("RGB")
-
-        # Convert PIL Image to numpy array
-        image_array = np.array(original_image)
-
-        # Perform detection
+        resized_image = original_image.resize((640, 640))
+        image_array = np.array(resized_image)
         results = model.predict(image_array)
-
-        # Extract detections and render image
         detections = results[0].boxes  # Get bounding boxes
         rendered_image = results[0].plot()  # Render detections on the image
-
-        # Convert rendered numpy array back to PIL Image
         detected_image = Image.fromarray(rendered_image)
 
         # Prepare detection info
@@ -202,24 +191,29 @@ def process_image_RPA(uploaded_file):
                 class_count[class_name] += 1
                 max_confidence[class_name] = max(max_confidence[class_name], confidence)
 
-        # Determine final class based on conditions
-        detected_classes = set(class_count.keys())
-        if "correct" in detected_classes and len(detected_classes) > 1:
-            # Condition 1: If "correct" exists with other classes
+        # Handle cases where detection_info is empty
+        if not detection_info:
             final_class = "check"
-            final_confidence = max_confidence["correct"]
-        elif "correct" in detected_classes and max_confidence["correct"] < 80:
-            # New Condition: If "correct" confidence is less than 80%
-            final_class = "check"
-            final_confidence = max_confidence["correct"]
-        elif len(detected_classes) > 1:
-            # Condition 2: If there is no "correct" but multiple classes exist
-            final_class = "incorrect"
-            final_confidence = max(max_confidence.values())
+            final_confidence = 0
         else:
-            # Condition 3: If all bounding boxes are the same class
-            final_class = list(detected_classes)[0]
-            final_confidence = max_confidence[final_class]
+            # Determine final class based on conditions
+            detected_classes = set(class_count.keys())
+            if "correct" in detected_classes and len(detected_classes) > 1:
+                # Condition 1: If "correct" exists with other classes
+                final_class = "check"
+                final_confidence = max_confidence["correct"]
+            elif "correct" in detected_classes and max_confidence["correct"] < 60:
+                # New Condition: If "correct" confidence is less than 80%
+                final_class = "check"
+                final_confidence = max_confidence["correct"]
+            elif len(detected_classes) > 1:
+                # Condition 2: If there is no "correct" but multiple classes exist
+                final_class = "incorrect"
+                final_confidence = max(max_confidence.values())
+            else:
+                # Condition 3: If all bounding boxes are the same class
+                final_class = list(detected_classes)[0]
+                final_confidence = max_confidence[final_class]
 
         # Return processed data
         return detected_image, [(final_class, final_confidence)]
@@ -229,6 +223,7 @@ def process_image_RPA(uploaded_file):
 
 # Automatically process uploaded images
 if uploaded_files:
+    reset_rpa_state()
     for uploaded_file in uploaded_files:
         process_image(uploaded_file)
 
@@ -280,6 +275,7 @@ if uploaded_files:
             ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
             ax.axis("equal")  # Equal aspect ratio ensures the pie chart is a circle
             st.pyplot(fig)
+            st.write("#")
 
     # Show Images
     elif view_option == "Show Images":
@@ -387,189 +383,143 @@ if uploaded_files:
                             f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
                             f'<h2 style="color: black">{final_type}</h2>'
                             f'<p style="color: black">{additional_text}</p>'
-                            f'</div>',
+                            f'</div>'
+                            f'<br>' 
+                            f'<br>',
                             unsafe_allow_html=True
                         )
                     else:
                         st.write("No detections found in the DataFrame.")
 
 
-# ตรวจสอบว่า DataFrame และผลลัพธ์ถูกเก็บใน session_state หรือไม่
-if "rpa_dataframe" not in st.session_state:
-    st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
-if "rpa_results" not in st.session_state:
-    st.session_state["rpa_results"] = []  # เก็บผลลัพธ์จากการประมวลผลภาพ
-
 # RPA Button to trigger RPA process and load images
 if st.button("RPA"):
-    try:
-        # แจ้งให้ผู้ใช้ทราบว่า RPA กำลังทำงาน
-        st.sidebar.write("Running RPA script to fetch images...")
+    # รีเซ็ตสถานะของส่วนการอัปโหลดรูป
+    reset_upload_state()
 
-        # เรียกใช้ RPA script (รอจนกระทั่งเสร็จสิ้น)
-        result = subprocess.run(
-            [
-                "python", 
-                "test_1.py", 
-                str(row), 
-                str(column), 
-                str(selected_date.month), 
-                str(selected_date.year)
-            ],
-            capture_output=True, 
-            text=True
-        )
+    # กำหนด path ของโฟลเดอร์ที่ต้องตรวจสอบ
+    # กำหนด path ของโฟลเดอร์ที่ต้องตรวจสอบ
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    selected_folder_name = selected_date.strftime("%Y-%m-%d")  # แปลงวันที่เป็นชื่อโฟลเดอร์
+    image_folder = os.path.join(script_dir, selected_folder_name)
+    csv_folder = os.path.join(script_dir, f"{selected_folder_name}_csv")
 
-        # ตรวจสอบผลลัพธ์จาก RPA script
-        if result.returncode == 0:
-            st.sidebar.success("RPA script completed successfully!")
+    # ตรวจสอบว่าโฟลเดอร์ทั้งสองมีอยู่แล้วหรือไม่
+    if not (os.path.exists(image_folder) and os.path.exists(csv_folder)):
+        try:
+            st.sidebar.write("Running RPA script to fetch images...")
+            result = subprocess.run(
+                [
+                    "python", 
+                    "rpa_test.py", 
+                    str(row), 
+                    str(column), 
+                    str(selected_date), 
+                    str(selected_date.month), 
+                    str(selected_date.year)
+                ],
+                capture_output=True, 
+                text=True
+            )
 
-            # ระบุ path ของโฟลเดอร์ download_images
-            script_dir = os.path.dirname(os.path.abspath(__file__))  # หา path ปัจจุบันของสคริปต์
-            image_folder = os.path.join(script_dir, "download_images/")
-            
-            if not os.path.exists(image_folder):
-                st.error(f"The folder '{image_folder}' does not exist.")
+            # ตรวจสอบผลลัพธ์จาก RPA script
+            if result.returncode == 0:
+                st.sidebar.success("RPA script completed successfully!")
+
+                # ดำเนินการขั้นตอนถัดไปทันทีหลังจากรัน RPA script เสร็จ
+                if os.path.exists(image_folder):
+                    image_files = [os.path.join(root, file) for root, _, files in os.walk(image_folder) for file in files if file.endswith(".jpg")]
+                    reset_rpa_state()
+                    if image_files:
+                        for image_file in image_files:
+                            filename = os.path.splitext(os.path.basename(image_file))[0]
+                            code = os.path.basename(os.path.dirname(image_file))
+                            detected_image, detection_info = process_image_RPA(image_file)
+                            if detected_image and isinstance(detection_info, list) and detection_info:
+                                st.session_state["rpa_results"].append({"Filename": filename, "Code": code, "Image File": image_file, "Detection Info": detection_info})
+                                for cls, confidence in detection_info:
+                                    new_row = pd.DataFrame([{ "Filename": filename, "Code": code, "Class Predict": cls, "Confidence": confidence }])
+                                    st.session_state["rpa_dataframe"] = pd.concat([st.session_state["rpa_dataframe"], new_row], ignore_index=True)
             else:
-                # โหลดไฟล์ภาพจากโฟลเดอร์ย่อยทั้งหมด
-                image_files = []
-                for root, _, files in os.walk(image_folder):  # ใช้ os.walk เพื่อเข้าถึงโฟลเดอร์ย่อย
-                    for file in files:
-                        if file.endswith(".jpg"):  # กรองเฉพาะไฟล์ภาพที่ลงท้ายด้วย .jpg
-                            image_files.append(os.path.join(root, file))  # เก็บ path แบบเต็มของไฟล์
-
-                # สร้าง DataFrame สำหรับผลลัพธ์
-                st.session_state["rpa_dataframe"] = pd.DataFrame(columns=["Filename", "Code", "Class Predict", "Confidence"])
-                st.session_state["rpa_results"] = []  # ล้างผลลัพธ์ก่อนเริ่มใหม่
-
-                if image_files:
-                    for image_file in image_files:
-                        # ดึงชื่อไฟล์และ code จาก path
-                        filename = os.path.splitext(os.path.basename(image_file))[0]  # ดึงชื่อไฟล์โดยไม่มี path และ .jpg
-                        code = os.path.basename(os.path.dirname(image_file))  # ดึงชื่อโฟลเดอร์ (แหล่งที่มาของรูป)
-
-                        # เปิดไฟล์ภาพและประมวลผล
-                        with open(image_file, "rb") as img_file:
-                            detected_image, detection_info = process_image_RPA(img_file)
-
-                            if detected_image:
-                                if isinstance(detection_info, list) and detection_info:  # ตรวจสอบว่ามีข้อมูล
-                                    st.session_state["rpa_results"].append({
-                                        "Filename": filename,  # เก็บเฉพาะชื่อไฟล์
-                                        "Code": code,  # เก็บแหล่งที่มาของรูป
-                                        "Image File": image_file,  # เก็บ path เต็มของรูปภาพ
-                                        "Detection Info": detection_info
-                                    })
-
-                                    for cls, confidence in detection_info:
-                                        new_row = pd.DataFrame([{
-                                            "Filename": filename,
-                                            "Code": code,
-                                            "Class Predict": cls,
-                                            "Confidence": confidence,
-                                        }])
-
-                                        st.session_state["rpa_dataframe"] = pd.concat(
-                                            [st.session_state["rpa_dataframe"], new_row], ignore_index=True
-                                        )
-
-                st.write("RPA process completed. Data is ready for viewing.")
-        else:
-            st.error(f"RPA script failed. Error: {result.stderr}")
-
-    except subprocess.CalledProcessError as e:
-        st.error(f"Error running RPA: {e}")
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
-
-# แสดงข้อมูลหากมีใน session_state
-if not st.session_state["rpa_dataframe"].empty:
-    st.write("###")
-    st.write("## Select Choice")
-    dataframe = st.session_state["rpa_dataframe"]
-
-    # เพิ่มเมนู Dropdown พร้อมตัวเลือก "ALL"
-    unique_codes = dataframe["Code"].unique()  # หา Code ที่ไม่ซ้ำ
-    options = ["ALL"] + list(unique_codes)  # เพิ่ม "ALL" เป็นตัวเลือกแรก
-    selected_code = st.selectbox(" ",options)
-
-    # กรอง DataFrame ตามตัวเลือกใน Dropdown
-    if selected_code == "ALL":
-        filtered_dataframe = dataframe
+                st.error(f"RPA script failed. Error: {result.stderr}")
+                st.stop()
+        except Exception as e:
+            st.error(f"An unexpected error occurred: {e}")
+            st.stop()
     else:
-        filtered_dataframe = dataframe[dataframe["Code"] == selected_code]
+        st.sidebar.write("Required folders already exist. Skipping RPA script.")
 
-    # รีเซ็ตดัชนีของ filtered_dataframe เพื่อให้เริ่มต้นที่ 1
+    # ดำเนินการขั้นตอนถัดไปหากโฟลเดอร์มีอยู่แล้ว
+    if os.path.exists(image_folder):
+        image_files = [os.path.join(root, file) for root, _, files in os.walk(image_folder) for file in files if file.endswith(".jpg")]
+        reset_rpa_state()
+        if image_files:
+            for image_file in image_files:
+                filename = os.path.splitext(os.path.basename(image_file))[0]
+                code = os.path.basename(os.path.dirname(image_file))
+                detected_image, detection_info = process_image_RPA(image_file)
+                if detected_image and isinstance(detection_info, list) and detection_info:
+                    st.session_state["rpa_results"].append({"Filename": filename, "Code": code, "Image File": image_file, "Detection Info": detection_info})
+                    for cls, confidence in detection_info:
+                        new_row = pd.DataFrame([{ "Filename": filename, "Code": code, "Class Predict": cls, "Confidence": confidence }])
+                        st.session_state["rpa_dataframe"] = pd.concat([st.session_state["rpa_dataframe"], new_row], ignore_index=True)
+        st.write("RPA process completed. Data is ready for viewing.")
+
+    
+# แสดงข้อมูลหากมีใน session_state
+dataframe = st.session_state["rpa_dataframe"]
+if not dataframe.empty and not csv_data.empty:
+    merged_data = pd.merge(csv_data, dataframe, left_on="รหัสร้าน", right_on="Code", how="outer")
+    merged_data = merged_data.drop(columns=["Code"])  # ลบคอลัมน์ซ้ำ
+    # st.write("### Merged Data")
+    # st.dataframe(merged_data)
+
+    # กรองข้อมูลตามรหัสร้าน
+    unique_codes = merged_data["รหัสร้าน"].dropna().unique()
+    options = ["ALL"] + list(unique_codes)
+    selected_code = st.selectbox("Select Code", options)
+    if selected_code == "ALL":
+        filtered_dataframe = merged_data
+    else:
+        filtered_dataframe = merged_data[merged_data["รหัสร้าน"] == selected_code]
+
     filtered_dataframe = filtered_dataframe.reset_index(drop=True)
-    filtered_dataframe.index += 1  # ตั้งค่าให้ index เริ่มต้นที่ 1
-
-    # แสดงตารางข้อมูลที่กรองแล้ว
+    filtered_dataframe.index += 1
     st.write(f"## Detection Results for Code: {selected_code}")
     st.dataframe(filtered_dataframe)
-    st.write("###")
-    
-    # Display Pie Chart
+
+    # แสดง Pie Chart
     if not filtered_dataframe.empty:
         st.write("## Classification Distribution")
-        
-        # ใช้ข้อมูลจาก filtered_dataframe แทน
         class_counts = filtered_dataframe["Class Predict"].value_counts()
         class_percentages = (class_counts / len(filtered_dataframe)) * 100
-
         fig, ax = plt.subplots()
         ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
-        ax.axis("equal")  # Equal aspect ratio ensures the pie chart is a circle
+        ax.axis("equal")
         st.pyplot(fig)
 
-
-    # แสดงภาพและข้อมูลเพิ่มเติม (ถ้ามีผลลัพธ์ใน session_state["rpa_results"])
-    st.write("###")
+    # แสดงภาพและข้อมูลเพิ่มเติม
     st.write("## Processed Images:")
-    filtered_results = (
-        st.session_state["rpa_results"] if selected_code == "ALL" else [
-            result for result in st.session_state["rpa_results"] if result["Code"] == selected_code
-        ]
-    )
-
+    filtered_results = st.session_state["rpa_results"] if selected_code == "ALL" else [result for result in st.session_state["rpa_results"] if result["Code"] == selected_code]
     for result in filtered_results:
         st.markdown(f"#### รหัสร้าน: {result['Code']}")
         st.markdown(f"#### Detected Image: {result['Filename']}")
         st.image(result['Image File'], use_container_width=True)
-
-        # แสดงข้อมูลเพิ่มเติม (เฉพาะชื่อคลาส)
-        detection_text = "<br>".join(
-            [f"{cls}" for cls, _ in result["Detection Info"]]
-        )
-        if detection_text == "correct":
-            additional_text = (
-                "Your PM work image meets the standard."
-            )
-        elif detection_text == "check":
-            additional_text = (
-                "Your PM work image is under review. Multiple types detected."
-            )
-        elif detection_text == "incorrect":
-            additional_text = (
-                "Your PM work image doesn't meet the standard.<br>"
-                "Please check for cleanliness, there should be no residual water and no sediment."
-            )
-        elif detection_text == "fail":
-            additional_text = (
-                "Your PM work image doesn't meet the standard.<br>"
-                "Please check for cleanliness, there should be no residual water and no sediment."
-            )
-        elif detection_text == "undetected":
-            additional_text = (
-                "No detectable objects found in the image. Please recheck the image."
-            )
+        detection_text = "<br>".join([f"{cls}" for cls, _ in result["Detection Info"]])
+        additional_text = {
+            "correct": "Your PM work image meets the standard.",
+            "check": "Your PM work image is under review. Multiple types detected.",
+            "incorrect": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
+            "fail": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
+            "undetected": "No detectable objects found in the image. Please recheck the image."
+        }.get(detection_text, "Unknown status")
         st.markdown(
             f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
             f'<h2 style="color: black">{detection_text}</h2>'
             f'<p style="color: black">{additional_text}</p>'
-            f'</div>'
-            f'<br>' 
-            f'<br>', unsafe_allow_html=True
+            f'</div><br><br>', unsafe_allow_html=True
         )
+
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: satit102688@gmail.com</div>", unsafe_allow_html=True)
