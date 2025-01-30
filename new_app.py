@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import subprocess
 import datetime
 import torch
@@ -93,7 +94,7 @@ def get_dataframe():
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\selenium_web\web_detect_tank\best.pt'
+    model_path = r'C:\selenium_web\web_detect_tank\best11_50_16.pt'
     return YOLO(model_path)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -113,7 +114,8 @@ def process_image(uploaded_file):
     try:
         # Open the uploaded image
         original_image = Image.open(uploaded_file).convert("RGB")
-        image_array = np.array(original_image)
+        resized_image = original_image.resize((640, 640))
+        image_array = np.array(resized_image)
         results = model.predict(image_array)  # Removed conf=confidence_threshold
         detections = results[0].boxes  # Get bounding boxes
         rendered_image = results[0].plot()  # Render detections on the image
@@ -202,10 +204,14 @@ def process_image_RPA(uploaded_file):
                 # Condition 1: If "correct" exists with other classes
                 final_class = "check"
                 final_confidence = max_confidence["correct"]
-            elif "correct" in detected_classes and max_confidence["correct"] < 60:
+            elif "correct" in detected_classes and max_confidence["correct"] < 70:
                 # New Condition: If "correct" confidence is less than 80%
                 final_class = "check"
                 final_confidence = max_confidence["correct"]
+            elif "incorrect" in detected_classes and max_confidence["incorrect"] < 80:
+                # New Condition: If "correct" confidence is less than 80%
+                final_class = "check"
+                final_confidence = max_confidence["incorrect"]
             elif len(detected_classes) > 1:
                 # Condition 2: If there is no "correct" but multiple classes exist
                 final_class = "incorrect"
@@ -411,7 +417,7 @@ if st.button("RPA"):
             result = subprocess.run(
                 [
                     "python", 
-                    "rpa_test.py", 
+                    "rpa_5.py", 
                     str(row), 
                     str(column), 
                     str(selected_date), 
@@ -483,6 +489,16 @@ if not dataframe.empty and not csv_data.empty:
     else:
         filtered_dataframe = merged_data[merged_data["รหัสร้าน"] == selected_code]
 
+    # กรองเฉพาะ Class Predict ที่มีอยู่ในข้อมูลที่เลือก
+    unique_classes = filtered_dataframe["Class Predict"].dropna().unique()
+    class_options = ["ALL"] + list(unique_classes) if len(unique_classes) > 0 else ["ALL"]
+    selected_class = st.selectbox("Select Class", class_options)
+
+    # กรองข้อมูลตาม Class Predict ที่เลือก
+    if selected_class != "ALL":
+        filtered_dataframe = filtered_dataframe[filtered_dataframe["Class Predict"] == selected_class]
+
+
     filtered_dataframe = filtered_dataframe.reset_index(drop=True)
     filtered_dataframe.index += 1
     st.write(f"## Detection Results for Code: {selected_code}")
@@ -500,7 +516,20 @@ if not dataframe.empty and not csv_data.empty:
 
     # แสดงภาพและข้อมูลเพิ่มเติม
     st.write("## Processed Images:")
-    filtered_results = st.session_state["rpa_results"] if selected_code == "ALL" else [result for result in st.session_state["rpa_results"] if result["Code"] == selected_code]
+    filtered_results = st.session_state["rpa_results"]
+
+    # กรองผลลัพธ์ตาม selected_code
+    if selected_code != "ALL":
+        filtered_results = [result for result in filtered_results if result["Code"] == selected_code]
+
+    # กรองผลลัพธ์ตาม selected_class
+    if selected_class != "ALL":
+        filtered_results = [
+            result for result in filtered_results
+            if any(cls == selected_class for cls, _ in result["Detection Info"])
+        ]
+
+    # แสดงรูปภาพที่ผ่านการกรอง
     for result in filtered_results:
         st.markdown(f"#### รหัสร้าน: {result['Code']}")
         st.markdown(f"#### Detected Image: {result['Filename']}")
@@ -519,7 +548,6 @@ if not dataframe.empty and not csv_data.empty:
             f'<p style="color: black">{additional_text}</p>'
             f'</div><br><br>', unsafe_allow_html=True
         )
-
 
 # Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: satit102688@gmail.com</div>", unsafe_allow_html=True)

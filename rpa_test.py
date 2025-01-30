@@ -151,9 +151,8 @@ try:
     search_button.click()
     time.sleep(3)
 
-    # day rows & column 
-    # tr = int(sys.argv[1])
-    # td = int(sys.argv[2])
+    driver.switch_to.window(driver.window_handles[1])
+
     tr = int(sys.argv[1])
     td = int(sys.argv[2])
 

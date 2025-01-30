@@ -6,7 +6,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-# from bs4 import BeautifulSoup
 import time
 import requests
 from PIL import Image
@@ -18,10 +17,7 @@ import urllib.parse
 import math
 import sys
 import io
-
 from selenium.webdriver.chrome.options import Options
-
-# ???
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
@@ -29,7 +25,8 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 # driver = webdriver.Chrome()
 
 # destination folder to keep file csv
-download_folder = "C:\\Users\\Ratti\\TestAI_WaterTank\\download_csv"
+download_folder = f"C:\selenium_web\web_detect_tank\{sys.argv[3]}_csv"
+os.makedirs(download_folder, exist_ok=True)
 
 # Setting options for download
 chrome_options = Options()
@@ -38,6 +35,10 @@ chrome_options.add_experimental_option("prefs", {
     "download.prompt_for_download": False,
     "directory_upgrade": True
 })
+
+chrome_options.add_argument("--enable-gpu")
+# chrome_options.add_argument("--disable-software-rasterizer")
+# chrome_options.add_argument("--use-gl=desktop")
 
 # using WebDriver Manager for manage ChromeDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
@@ -66,7 +67,7 @@ def get_max_pages():
 try:
     # Open Website
     driver.get("https://pm-rsm.cpretailink.co.th/login")
-    output_dir = "download_images"
+    output_dir = f"{sys.argv[3]}"
     time.sleep(2)
 
     # Put Username & Password then Enter Login
@@ -88,7 +89,7 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_put = int(sys.argv[4])
+    year_put = int(sys.argv[5])
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -103,7 +104,7 @@ try:
         year_select.click()
         time.sleep(2)
 
-    month_put = int(sys.argv[3])
+    month_put = int(sys.argv[4])
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
@@ -156,13 +157,15 @@ try:
     search_button.click()
     time.sleep(3)
 
+    driver.switch_to.window(driver.window_handles[1])
     # day rows & column 
     tr = int(sys.argv[1])
     td = int(sys.argv[2])
 
-    day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
-    driver.find_element(By.XPATH, day_xpath).click()
-    time.sleep(2)
+    # day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[1]/td[5]/div/div[2]/div[1]/a'
+    day_search = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a/div/div/div/div')
+    day_search.click()
+    time.sleep(4)
 
     # Var downloaded_urls
     downloaded_urls = set() 
@@ -177,7 +180,7 @@ try:
     max_pages = get_max_pages()
 
     # Not finish Page
-    if current_page <= max_pages:
+    if current_page <= max_pages:   
         try:
             total_rows = len(driver.find_elements(By.XPATH, '//app-table-contract/div/table/tbody/tr'))
             print(f"พบหัวข้อทั้งหมด {total_rows} รายการในหน้า {current_page}")
@@ -215,8 +218,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
                                 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
@@ -296,8 +299,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
@@ -379,8 +382,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
@@ -488,8 +491,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
@@ -582,8 +585,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
@@ -682,8 +685,8 @@ try:
                                 time.sleep(7)
 
                                 # Create Folder of store before Downloading image
-                                os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
-                                output_dir = f"download_images/{number_store_text}"
+                                os.makedirs(f"{sys.argv[3]}/{str(number_store_text)}", exist_ok=True)
+                                output_dir = f"{sys.argv[3]}/{number_store_text}"
 
                                 # Find element of Path div
                                 div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")

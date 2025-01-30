@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import subprocess
 import datetime
 import torch
@@ -93,7 +94,7 @@ def get_dataframe():
 # Load YOLOv8 Model only once
 @st.cache_resource
 def load_model():
-    model_path = r'C:\selenium_web\web_detect_tank\best.pt'
+    model_path = r'C:\selenium_web\web_detect_tank\best11_50_8.pt'
     return YOLO(model_path)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -113,7 +114,8 @@ def process_image(uploaded_file):
     try:
         # Open the uploaded image
         original_image = Image.open(uploaded_file).convert("RGB")
-        image_array = np.array(original_image)
+        resized_image = original_image.resize((640, 640))
+        image_array = np.array(resized_image)
         results = model.predict(image_array)  # Removed conf=confidence_threshold
         detections = results[0].boxes  # Get bounding boxes
         rendered_image = results[0].plot()  # Render detections on the image
@@ -206,6 +208,10 @@ def process_image_RPA(uploaded_file):
                 # New Condition: If "correct" confidence is less than 80%
                 final_class = "check"
                 final_confidence = max_confidence["correct"]
+            elif "incorrect" in detected_classes and max_confidence["incorrect"] < 60:
+                # New Condition: If "correct" confidence is less than 80%
+                final_class = "check"
+                final_confidence = max_confidence["incorrect"]
             elif len(detected_classes) > 1:
                 # Condition 2: If there is no "correct" but multiple classes exist
                 final_class = "incorrect"
@@ -392,134 +398,96 @@ if uploaded_files:
                         st.write("No detections found in the DataFrame.")
 
 
-# RPA Button to trigger RPA process and load images
 if st.button("RPA"):
-    # รีเซ็ตสถานะของส่วนการอัปโหลดรูป
     reset_upload_state()
-
-    # กำหนด path ของโฟลเดอร์ที่ต้องตรวจสอบ
-    # กำหนด path ของโฟลเดอร์ที่ต้องตรวจสอบ
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    selected_folder_name = selected_date.strftime("%Y-%m-%d")  # แปลงวันที่เป็นชื่อโฟลเดอร์
+    selected_folder_name = selected_date.strftime("%Y-%m-%d")
     image_folder = os.path.join(script_dir, selected_folder_name)
     csv_folder = os.path.join(script_dir, f"{selected_folder_name}_csv")
-
-    # ตรวจสอบว่าโฟลเดอร์ทั้งสองมีอยู่แล้วหรือไม่
+    
     if not (os.path.exists(image_folder) and os.path.exists(csv_folder)):
         try:
             st.sidebar.write("Running RPA script to fetch images...")
-            result = subprocess.run(
-                [
-                    "python", 
-                    "rpa_test.py", 
-                    str(row), 
-                    str(column), 
-                    str(selected_date), 
-                    str(selected_date.month), 
-                    str(selected_date.year)
-                ],
-                capture_output=True, 
-                text=True
-            )
-
-            # ตรวจสอบผลลัพธ์จาก RPA script
+            result = subprocess.run([
+                "python", "rpa_5.py", str(row), str(column), str(selected_date), 
+                str(selected_date.month), str(selected_date.year)
+            ], capture_output=True, text=True)
+            
             if result.returncode == 0:
                 st.sidebar.success("RPA script completed successfully!")
-
-                # ดำเนินการขั้นตอนถัดไปทันทีหลังจากรัน RPA script เสร็จ
-                if os.path.exists(image_folder):
-                    image_files = [os.path.join(root, file) for root, _, files in os.walk(image_folder) for file in files if file.endswith(".jpg")]
-                    reset_rpa_state()
-                    if image_files:
-                        for image_file in image_files:
-                            filename = os.path.splitext(os.path.basename(image_file))[0]
-                            code = os.path.basename(os.path.dirname(image_file))
-                            detected_image, detection_info = process_image_RPA(image_file)
-                            if detected_image and isinstance(detection_info, list) and detection_info:
-                                st.session_state["rpa_results"].append({"Filename": filename, "Code": code, "Image File": image_file, "Detection Info": detection_info})
-                                for cls, confidence in detection_info:
-                                    new_row = pd.DataFrame([{ "Filename": filename, "Code": code, "Class Predict": cls, "Confidence": confidence }])
-                                    st.session_state["rpa_dataframe"] = pd.concat([st.session_state["rpa_dataframe"], new_row], ignore_index=True)
             else:
                 st.error(f"RPA script failed. Error: {result.stderr}")
                 st.stop()
         except Exception as e:
             st.error(f"An unexpected error occurred: {e}")
             st.stop()
-    else:
-        st.sidebar.write("Required folders already exist. Skipping RPA script.")
-
-    # ดำเนินการขั้นตอนถัดไปหากโฟลเดอร์มีอยู่แล้ว
+    
+    # โหลดข้อมูลหลังจากรัน RPA script
+    dataframe = load_csv_data(selected_date)
+    
     if os.path.exists(image_folder):
         image_files = [os.path.join(root, file) for root, _, files in os.walk(image_folder) for file in files if file.endswith(".jpg")]
         reset_rpa_state()
+        
         if image_files:
             for image_file in image_files:
                 filename = os.path.splitext(os.path.basename(image_file))[0]
                 code = os.path.basename(os.path.dirname(image_file))
                 detected_image, detection_info = process_image_RPA(image_file)
+                
                 if detected_image and isinstance(detection_info, list) and detection_info:
                     st.session_state["rpa_results"].append({"Filename": filename, "Code": code, "Image File": image_file, "Detection Info": detection_info})
                     for cls, confidence in detection_info:
                         new_row = pd.DataFrame([{ "Filename": filename, "Code": code, "Class Predict": cls, "Confidence": confidence }])
                         st.session_state["rpa_dataframe"] = pd.concat([st.session_state["rpa_dataframe"], new_row], ignore_index=True)
-        st.write("RPA process completed. Data is ready for viewing.")
-
     
-# แสดงข้อมูลหากมีใน session_state
-dataframe = st.session_state["rpa_dataframe"]
-if not dataframe.empty and not csv_data.empty:
-    merged_data = pd.merge(csv_data, dataframe, left_on="รหัสร้าน", right_on="Code", how="outer")
-    merged_data = merged_data.drop(columns=["Code"])  # ลบคอลัมน์ซ้ำ
-    # st.write("### Merged Data")
-    # st.dataframe(merged_data)
+    st.write("RPA process completed. Data is ready for viewing.")
+    
+# แสดงผลลัพธ์
+if not st.session_state["rpa_dataframe"].empty:
+    dataframe = st.session_state["rpa_dataframe"]
+    csv_data = load_csv_data(selected_date)
+    
+    if not dataframe.empty and not csv_data.empty:
+        merged_data = pd.merge(csv_data, dataframe, left_on="รหัสร้าน", right_on="Code", how="outer").drop(columns=["Code"])
+        selected_code = st.selectbox("Select Code", ["ALL"] + list(merged_data["รหัสร้าน"].dropna().unique()))
+        
+        filtered_dataframe = merged_data if selected_code == "ALL" else merged_data[merged_data["รหัสร้าน"] == selected_code]
+        selected_class = st.selectbox("Select Class", ["ALL"] + list(filtered_dataframe["Class Predict"].dropna().unique()))
+        if selected_class != "ALL":
+            filtered_dataframe = filtered_dataframe[filtered_dataframe["Class Predict"] == selected_class]
+        
+        st.dataframe(filtered_dataframe.reset_index(drop=True))
+        
+        if not filtered_dataframe.empty:
+            st.write("## Classification Distribution")
+            class_counts = filtered_dataframe["Class Predict"].value_counts()
+            fig, ax = plt.subplots()
+            ax.pie((class_counts / len(filtered_dataframe)) * 100, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
+            ax.axis("equal")
+            st.pyplot(fig)
+        
+        for result in st.session_state["rpa_results"]:
+            if selected_code != "ALL" and result["Code"] != selected_code:
+                continue
+            if selected_class != "ALL" and not any(cls == selected_class for cls, _ in result["Detection Info"]):
+                continue
+            st.markdown(f"#### รหัสร้าน: {result['Code']}")
+            st.markdown(f"#### Detected Image: {result['Filename']}")
+            st.image(result['Image File'], use_container_width=True)
+            detection_text = "<br>".join([f"{cls}" for cls, _ in result["Detection Info"]])
+            additional_text = {
+                "correct": "Your PM work image meets the standard.",
+                "check": "Your PM work image is under review. Multiple types detected.",
+                "incorrect": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
+                "fail": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
+                "undetected": "No detectable objects found in the image. Please recheck the image."
+            }.get(detection_text, "Unknown status")
+            st.markdown(
+                f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
+                f'<h2 style="color: black">{detection_text}</h2>'
+                f'<p style="color: black">{additional_text}</p>'
+                f'</div><br><br>', unsafe_allow_html=True
+            )
 
-    # กรองข้อมูลตามรหัสร้าน
-    unique_codes = merged_data["รหัสร้าน"].dropna().unique()
-    options = ["ALL"] + list(unique_codes)
-    selected_code = st.selectbox("Select Code", options)
-    if selected_code == "ALL":
-        filtered_dataframe = merged_data
-    else:
-        filtered_dataframe = merged_data[merged_data["รหัสร้าน"] == selected_code]
-
-    filtered_dataframe = filtered_dataframe.reset_index(drop=True)
-    filtered_dataframe.index += 1
-    st.write(f"## Detection Results for Code: {selected_code}")
-    st.dataframe(filtered_dataframe)
-
-    # แสดง Pie Chart
-    if not filtered_dataframe.empty:
-        st.write("## Classification Distribution")
-        class_counts = filtered_dataframe["Class Predict"].value_counts()
-        class_percentages = (class_counts / len(filtered_dataframe)) * 100
-        fig, ax = plt.subplots()
-        ax.pie(class_percentages, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
-        ax.axis("equal")
-        st.pyplot(fig)
-
-    # แสดงภาพและข้อมูลเพิ่มเติม
-    st.write("## Processed Images:")
-    filtered_results = st.session_state["rpa_results"] if selected_code == "ALL" else [result for result in st.session_state["rpa_results"] if result["Code"] == selected_code]
-    for result in filtered_results:
-        st.markdown(f"#### รหัสร้าน: {result['Code']}")
-        st.markdown(f"#### Detected Image: {result['Filename']}")
-        st.image(result['Image File'], use_container_width=True)
-        detection_text = "<br>".join([f"{cls}" for cls, _ in result["Detection Info"]])
-        additional_text = {
-            "correct": "Your PM work image meets the standard.",
-            "check": "Your PM work image is under review. Multiple types detected.",
-            "incorrect": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
-            "fail": "Your PM work image doesn't meet the standard. Please check for cleanliness.",
-            "undetected": "No detectable objects found in the image. Please recheck the image."
-        }.get(detection_text, "Unknown status")
-        st.markdown(
-            f'<div style="border: 2px solid black; padding: 10px; background-color: #f0f0f0; text-align: center;">'
-            f'<h2 style="color: black">{detection_text}</h2>'
-            f'<p style="color: black">{additional_text}</p>'
-            f'</div><br><br>', unsafe_allow_html=True
-        )
-
-
-# Footer
 st.markdown("<div class='footer'>Developed by Your Name | Contact: satit102688@gmail.com</div>", unsafe_allow_html=True)
