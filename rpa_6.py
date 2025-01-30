@@ -18,13 +18,32 @@ import urllib.parse
 import math
 import sys
 import io
+from selenium.webdriver.chrome.options import Options
+
+# ???
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Setting WebDriver to chrome
-driver = webdriver.Chrome()
+# driver = webdriver.Chrome()
+
+# destination folder to keep file csv
+download_folder = "C:\\Users\\Ratti\\TestAI_WaterTank\\download_csv"
+
+# Setting options for download
+chrome_options = Options()
+chrome_options.add_experimental_option("prefs", {
+    "download.default_directory": download_folder,
+    "download.prompt_for_download": False,
+    "directory_upgrade": True
+})
+
+# using WebDriver Manager for manage ChromeDriver
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 # Function for calculate page for using max_pages
+# Maybe THIS ERROR
+# FIX or NOT ???
 def get_max_pages():
     # Pull XPATH ALL ROWS
     rows_ALL = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/div')
@@ -38,21 +57,10 @@ def get_max_pages():
     print(pages_pp)
     return pages_pp
 
-def download_file(url, download_folder, filename): 
-    if not filename.endswith('.csv'):
-        filename += '.csv'
+# Click for downloaded ???
 
-    os.makedirs(download_folder, exist_ok=True)
-
-    response = requests.get(url)
-    if response.status_code == 200:
-        file_path = os.path.join(download_folder, filename)
-        with open(file_path, 'wb') as file:
-            file.write(response.content)
-        print(f"ดาวน์โหลดไฟล์สำเร็จ: {file_path}")
-    else:
-        print(f"การดาวน์โหลดล้มเหลว: {response.status_code}") 
-
+# PROBLEM !!!
+# When try to get images of date (02/01/2025) its terminated before process images finish
 
 try:
     # Open Website
@@ -79,7 +87,8 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    year_put = int(sys.argv[4])
+    # year_put = int(sys.argv[4])
+    year_put = 2024
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -94,7 +103,8 @@ try:
         year_select.click()
         time.sleep(2)
 
-    month_put = int(sys.argv[3])
+    # month_put = int(sys.argv[3])
+    month_put = 4
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
@@ -145,11 +155,16 @@ try:
     # Select search
     search_button = driver.find_element(By.XPATH, '/html/body/app-root/app-plan-search/div/div/div[2]/app-search-pm-box/div/form/div[7]/button')
     search_button.click()
-    time.sleep(3)
+    time.sleep(5)
+
+    # Switch to New Tab for next processing
+    driver.switch_to.window(driver.window_handles[1])
 
     # day rows & column 
-    tr = int(sys.argv[1])
-    td = int(sys.argv[2])
+    tr = 2
+    td = 7
+    # tr = int(sys.argv[1])
+    # td = int(sys.argv[2])
 
     day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
     driver.find_element(By.XPATH, day_xpath).click()
@@ -166,35 +181,219 @@ try:
 
     # max pages should fill by Total of pages that calculated
     max_pages = get_max_pages()
-    print(max_pages)
+
+    # Click excel button for downloading csv file
+    csv_click = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/div/div[2]/div/button')
+    csv_click.click()
+    time.sleep(5)
+
+    # Pull XPATH ALL ROWS
+    rows_ALL = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/div')
+    rows_text = rows_ALL.text.strip()  
+    index_of_of = rows_text.find('of')
+    rows_count = float(rows_text[index_of_of + 2:].strip())
+
+    # Split Text back 'of'
+    rows_count = float(rows_text.split('of')[-1].strip())
+    print(f"มีจำนวนแถวทั้งหมด {rows_count}")
+
+    count_row_now = 0
 
     # Not finish Page
-    if current_page <= max_pages:
+    while current_page <= max_pages:
         try:
             total_rows = len(driver.find_elements(By.XPATH, '//app-table-contract/div/table/tbody/tr'))
             print(f"พบหัวข้อทั้งหมด {total_rows} รายการในหน้า {current_page}")
 
+            # Split Date
             name_file = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/div/div[1]')
             name_file_text = name_file.text.strip()
-            
-            url = 'https://pm-rsm.cpretailink.co.th/e-service-table/รายงานสรุปงาน_PM.csv'  
-            download_folder = "download_csv" 
-            filename = name_file_text
-
-            # Split Date
             date = name_file_text.split("PM")[1].strip()
-
-            download_file(url, download_folder, filename)
 
             if current_page == 1:
                 try:
                     # Topic 1 - end
+
                     for row_index in range(1, total_rows + 1):
                         try:
                             topic_xpath = f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[5]'
                             topic_link = driver.find_element(By.XPATH, topic_xpath)
+
+                            if count_row_now == rows_count:
+
+                                if 5 <= row_index < 10:
+                                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                                    time.sleep(3)
+
+                                    # Check 'รหัสร้าน' before Click
+                                    number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                    number_store_text = number_store.text.strip()
+
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
+                                    topic_link.click()
+                                    print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
+                                    time.sleep(5)
+
+                                    # Create Folder of store before Downloading image
+                                    os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                    output_dir = f"download_images/{number_store_text}"
                                     
-                            if 5 <= row_index < total_rows:
+                                    # Find element of Path div
+                                    div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
+                                    div_elements_drink = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำดื่ม')]")
+
+                                    # Download Picture for keep in folder
+                                    # For Using Water Tank
+                                    for div in div_elements_use:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำใช้_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    # For Drinking Water Tank
+                                    for div in div_elements_drink:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำดื่ม_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    driver.back()
+                                    time.sleep(5)
+
+                                    break
+
+                                elif row_index < 5:
+
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
+
+                                    # Check 'รหัสร้าน' before Click
+                                    number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                    number_store_text = number_store.text.strip()
+
+                                    topic_link.click()
+                                    print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
+                                    time.sleep(5)
+
+                                    # Create Folder of store before Downloading image
+                                    os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                    output_dir = f"download_images/{number_store_text}"
+
+                                    # Find element of Path div
+                                    div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
+                                    div_elements_drink = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำดื่ม')]")
+
+                                    # Download Picture for keep in folder
+                                    # For Using Water Tank
+                                    for div in div_elements_use:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำใช้_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    # For Drinking Water Tank
+                                    for div in div_elements_drink:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำดื่ม_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    driver.back()
+                                    time.sleep(3)
+                                    
+                                    break
+
+                            if 5 <= row_index < 10 and count_row_now != rows_count:
+                                
+                                count_row_now += 1
+
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
@@ -205,7 +404,7 @@ try:
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -275,9 +474,12 @@ try:
                                                     print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
 
                                 driver.back()
-                                time.sleep(3)
+                                time.sleep(5)
 
-                            elif row_index < 5:
+                            elif row_index < 5 and count_row_now != rows_count:
+
+                                count_row_now += 1
+
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
 
                                 # Check 'รหัสร้าน' before Click
@@ -286,7 +488,7 @@ try:
 
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -358,7 +560,9 @@ try:
                                 driver.back()
                                 time.sleep(3)
                             
-                            elif row_index == total_rows:
+                            elif row_index == 10 and count_row_now != rows_count:
+                                count_row_now += 1
+
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
@@ -369,7 +573,7 @@ try:
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -444,12 +648,11 @@ try:
                                 current_page += 1
 
                                 next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
-                                
                                 next_button.click()
                                 time.sleep(3)
                                 
                                 driver.execute_script("window.scrollTo(0, 0);")
-                                time.sleep(2)
+                                time.sleep(3)
 
                         except Exception as e:
                             print(f"เกิดข้อผิดพลาดในหัวข้อที่ {row_index}: {e}")
@@ -458,15 +661,217 @@ try:
                 except Exception as e:
                     print(f"เกิดข้อผิดพลาด: {e}")
 
-            if current_page >= 2:
+            if current_page >= 2 or current_page < max_pages:
                 try:
                     # Topic 1 - end
                     for row_index in range(1, total_rows + 1):
                         try:
                             topic_xpath = f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[5]'
                             topic_link = driver.find_element(By.XPATH, topic_xpath)
+
+                            if count_row_now == rows_count:
+
+                                if 5 <= row_index < 10:
+                                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                                    time.sleep(3)
+
+                                    # Check 'รหัสร้าน' before Click
+                                    number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                    number_store_text = number_store.text.strip()
+
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
+                                    topic_link.click()
+                                    print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
+                                    time.sleep(5)
+
+                                    # Create Folder of store before Downloading image
+                                    os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                    output_dir = f"download_images/{number_store_text}"
+
+                                    # Find element of Path div
+                                    div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
+                                    div_elements_drink = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำดื่ม')]")
+
+                                    # Download Picture for keep in folder
+                                    # For Using Water Tank
+                                    for div in div_elements_use:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำใช้_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    # For Drinking Water Tank
+                                    for div in div_elements_drink:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำดื่ม_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    driver.back()
+                                    time.sleep(3)
+
+                                    for next_count in range(i):
+                                        try:
+                                            next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
+                                            next_button.click()
+                                            time.sleep(3)
+
+                                        except Exception as e:
+                                            print(f"เกิดข้อผิดพลาด: {e}")
+                                            break
                                     
-                            if 5 <= row_index < total_rows:
+                                    break
+
+                                elif row_index < 5:
+
+                                    driver.execute_script("window.scrollTo(0, 0);")
+                                    time.sleep(3)
+
+                                    # Check 'รหัสร้าน' before Click
+                                    number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
+                                    number_store_text = number_store.text.strip()
+
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
+                                    topic_link.click()
+                                    print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
+                                    time.sleep(5)
+
+                                    # Create Folder of store before Downloading image
+                                    os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
+                                    output_dir = f"download_images/{number_store_text}"
+
+                                    # Find element of Path div
+                                    div_elements_use = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำใช้')]")
+                                    div_elements_drink = driver.find_elements(By.XPATH, "//div[contains(text(), 'ถังน้ำดื่ม')]")
+
+                                    # Download Picture for keep in folder
+                                    # For Using Water Tank
+                                    for div in div_elements_use:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำใช้_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+                                    # For Drinking Water Tank
+                                    for div in div_elements_drink:
+
+                                        div_text = div.text
+                                        # Use text before "ถังน้ำใช้"
+                                        number = div_text.split(' ')[0] 
+
+                                        # Searching Text "รูปหลังทำ"
+                                        after_use_div = div.find_elements(By.XPATH, ".//div[contains(text(), 'รูปหลังทำ')]")
+                                        
+                                        if after_use_div:
+                                            # Seraching images part "รูปหลังทำ"
+                                            image_elements = after_use_div[0].find_elements(By.XPATH, ".//img")
+                                            for idx, img in enumerate(image_elements):
+                                                image_url = img.get_attribute("src")
+                                                if image_url:
+                                                    # File name
+                                                    filename = os.path.join(output_dir, f"{number}_ถังน้ำดื่ม_{idx + 1}.jpg")
+                                                    
+                                                    response = requests.get(image_url, stream=True)
+                                                    if response.status_code == 200:
+                                                        # Downloading image
+                                                        with open(filename, 'wb') as file:
+                                                            for chunk in response.iter_content(1024):
+                                                                file.write(chunk)
+                                                        print(f"ดาวน์โหลดรูปภาพสำเร็จ: {filename}")
+                                                    else:
+                                                        print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
+
+
+                                    driver.back()
+                                    time.sleep(3)
+
+                                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                                    time.sleep(3)
+
+                                    for next_count in range(i):
+                                        try:
+                                            next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
+                                            next_button.click()
+                                            time.sleep(3)
+
+                                        except Exception as e:
+                                            print(f"เกิดข้อผิดพลาด: {e}")
+                                            break
+
+                                    driver.execute_script("window.scrollTo(0, 0);")
+                                    time.sleep(3)
+
+                                    break
+                                    
+                            if 5 <= row_index < 10 and count_row_now != rows_count:
+
+                                count_row_now += 1
 
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
@@ -478,7 +883,7 @@ try:
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -560,10 +965,12 @@ try:
                                         print(f"เกิดข้อผิดพลาด: {e}")
                                         break
 
-                            elif row_index < 5:
+                            elif row_index < 5 and count_row_now != rows_count:
+
+                                count_row_now += 1
 
                                 driver.execute_script("window.scrollTo(0, 0);")
-                                time.sleep(2)
+                                time.sleep(3)
 
                                 # Check 'รหัสร้าน' before Click
                                 number_store = driver.find_element(By.XPATH, f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[6]')
@@ -572,7 +979,7 @@ try:
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -659,9 +1066,12 @@ try:
                                         break
 
                                 driver.execute_script("window.scrollTo(0, 0);")
-                                time.sleep(2)
-                            
-                            elif row_index == total_rows:
+                                time.sleep(3)
+
+                            elif row_index == 10 and count_row_now != rows_count:
+
+                                count_row_now += 1
+
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
 
@@ -672,7 +1082,7 @@ try:
                                 driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
                                 topic_link.click()
                                 print(f"กำลังคลิกหัวข้อที่ {row_index} ในหน้า {current_page}")
-                                time.sleep(3)
+                                time.sleep(5)
 
                                 # Create Folder of store before Downloading image
                                 os.makedirs(f"download_images/{str(number_store_text)}", exist_ok=True)
@@ -742,8 +1152,8 @@ try:
                                                     print(f"ไม่สามารถดาวน์โหลดรูปภาพจาก {image_url} ได้ (HTTP {response.status_code})")
 
                                 driver.back()
-                                time.sleep(3)
-
+                                time.sleep(2)
+                                
                                 current_page += 1
 
                                 for next_count in range(i):
@@ -760,11 +1170,13 @@ try:
 
                                 next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
                                 next_button.click()
+                                time.sleep(5)
+
+                                driver.execute_script("window.scrollTo(0, 0);")
                                 time.sleep(3)
 
                         except Exception as e:
                             print(f"เกิดข้อผิดพลาด: {e}")
-                            break
                 
                 except Exception as e:
                     print(f"เกิดข้อผิดพลาด: {e}")
