@@ -87,8 +87,7 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-    # year_put = int(sys.argv[4])
-    year_put = 2024
+    year_put = int(sys.argv[4])
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -103,8 +102,7 @@ try:
         year_select.click()
         time.sleep(2)
 
-    # month_put = int(sys.argv[3])
-    month_put = 4
+    month_put = int(sys.argv[3])
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
@@ -161,14 +159,23 @@ try:
     driver.switch_to.window(driver.window_handles[1])
 
     # day rows & column 
-    tr = 2
-    td = 7
-    # tr = int(sys.argv[1])
-    # td = int(sys.argv[2])
+    tr = int(sys.argv[1])
+    td = int(sys.argv[2])
 
-    day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
-    driver.find_element(By.XPATH, day_xpath).click()
-    time.sleep(2)
+    # IN CASE - rpa didnt see element
+    if tr <= 2:
+        # Just click
+        day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
+        driver.find_element(By.XPATH, day_xpath).click()
+        time.sleep(2)
+    elif tr > 2:
+        # Scroll Down for show element
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(3)
+
+        day_xpath = f'/html/body/app-root/app-e-service-plan/div/full-calendar/div[2]/div/table/tbody/tr/td/div/div/div/table/tbody/tr[{tr}]/td[{td}]/div/div[2]/div[1]/a'
+        driver.find_element(By.XPATH, day_xpath).click()
+        time.sleep(2)
 
     # Var downloaded_urls
     downloaded_urls = set() 
@@ -213,15 +220,16 @@ try:
             if current_page == 1:
                 try:
                     # Topic 1 - end
-
                     for row_index in range(1, total_rows + 1):
                         try:
                             topic_xpath = f'/html/body/app-root/app-e-service-table/div/app-table-contract/div/table/tbody/tr[{row_index}]/td[5]'
                             topic_link = driver.find_element(By.XPATH, topic_xpath)
 
-                            if count_row_now == rows_count:
+                            if row_index == rows_count:
 
                                 if 5 <= row_index < 10:
+                                    count_row_now += 1
+
                                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                     time.sleep(3)
 
@@ -304,9 +312,11 @@ try:
                                     driver.back()
                                     time.sleep(5)
 
-                                    break
+                                    # OVER VALUE for quit loop
+                                    current_page += 500
 
                                 elif row_index < 5:
+                                    count_row_now += 1
 
                                     driver.execute_script("arguments[0].scrollIntoView(true);", topic_link)
 
@@ -387,8 +397,9 @@ try:
 
                                     driver.back()
                                     time.sleep(3)
-                                    
-                                    break
+
+                                    # OVER VALUE for quit loop
+                                    current_page += 500
 
                             if 5 <= row_index < 10 and count_row_now != rows_count:
                                 
@@ -476,7 +487,7 @@ try:
                                 driver.back()
                                 time.sleep(5)
 
-                            elif row_index < 5 and count_row_now != rows_count:
+                            elif row_index < 5 and row_index != rows_count:
 
                                 count_row_now += 1
 
@@ -562,6 +573,8 @@ try:
                             
                             elif row_index == 10 and count_row_now != rows_count:
                                 count_row_now += 1
+
+                                print(f"จำนวนแถวที่ทำไปแล้ว {count_row_now}")
 
                                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                 time.sleep(3)
@@ -661,7 +674,7 @@ try:
                 except Exception as e:
                     print(f"เกิดข้อผิดพลาด: {e}")
 
-            if current_page >= 2 or current_page < max_pages:
+            if current_page >= 2 and current_page <= max_pages:
                 try:
                     # Topic 1 - end
                     for row_index in range(1, total_rows + 1):
@@ -671,7 +684,7 @@ try:
 
                             if count_row_now == rows_count:
 
-                                if 5 <= row_index < 10:
+                                if 5 <= row_index <= 10:
                                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                     time.sleep(3)
 
@@ -753,18 +766,9 @@ try:
 
                                     driver.back()
                                     time.sleep(3)
-
-                                    for next_count in range(i):
-                                        try:
-                                            next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
-                                            next_button.click()
-                                            time.sleep(3)
-
-                                        except Exception as e:
-                                            print(f"เกิดข้อผิดพลาด: {e}")
-                                            break
                                     
-                                    break
+                                    # OVER VALUE for quit loop
+                                    current_page += 500
 
                                 elif row_index < 5:
 
@@ -854,20 +858,8 @@ try:
                                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                                     time.sleep(3)
 
-                                    for next_count in range(i):
-                                        try:
-                                            next_button = driver.find_element(By.XPATH, '/html/body/app-root/app-e-service-table/div/mat-paginator/div/div/div[2]/button[3]/span[4]')
-                                            next_button.click()
-                                            time.sleep(3)
-
-                                        except Exception as e:
-                                            print(f"เกิดข้อผิดพลาด: {e}")
-                                            break
-
-                                    driver.execute_script("window.scrollTo(0, 0);")
-                                    time.sleep(3)
-
-                                    break
+                                    # OVER VALUE for quit loop
+                                    current_page += 500
                                     
                             if 5 <= row_index < 10 and count_row_now != rows_count:
 
