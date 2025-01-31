@@ -40,7 +40,7 @@ def load_csv_data(selected_date):
         if csv_files:
             file_path = os.path.join(folder_path, csv_files[0])  # ใช้ไฟล์ CSV แรกที่พบ
             df = pd.read_csv(file_path)
-            df = df.drop(columns=["เวลาเริ่มงาน", "เวลาปิดงาน", "ข้อเสนอแนะ", "ข้อเสนอแนะเพิ่มเติม"], errors='ignore')
+            df = df.drop(columns=["ข้อเสนอแนะ", "ข้อเสนอแนะเพิ่มเติม"], errors='ignore')
             return df
     st.error(f"No CSV file found in: {folder_path}")
     return pd.DataFrame()
@@ -76,10 +76,6 @@ if "rpa_results" not in st.session_state:
 
 def reset_rpa_state():
     st.session_state["rpa_results"] = []
-
-def get_dataframe():
-    return st.session_state["dataframe"]
-
 
 # Load YOLOv8 Model only once
 @st.cache_resource
@@ -215,26 +211,54 @@ if not st.session_state["rpa_dataframe"].empty:
     
     if not dataframe.empty and not csv_data.empty:
         merged_data = pd.merge(csv_data, dataframe, left_on="รหัสร้าน", right_on="Code", how="outer").drop(columns=["Code"])
-        selected_code = st.selectbox("Select Code", ["ALL"] + list(merged_data["รหัสร้าน"].dropna().unique()))
         
-        filtered_dataframe = merged_data if selected_code == "ALL" else merged_data[merged_data["รหัสร้าน"] == selected_code]
-        selected_class = st.selectbox("Select Class", ["ALL"] + list(filtered_dataframe["Class Predict"].dropna().unique()))
+        # เพิ่ม dropdown สำหรับเลือกโซนที่จุดนี้
+        unique_zones = ["ALL"] + sorted(merged_data["โซน"].dropna().unique().tolist())
+        selected_zone = st.selectbox("Select Zone", unique_zones)
+        
+        # กรองข้อมูลตามโซนที่เลือก
+        filtered_data = merged_data.copy()
+        if selected_zone != "ALL":
+            filtered_data = filtered_data[filtered_data["โซน"] == selected_zone]
+        
+        # อัปเดตรายการรหัสร้านตามโซนที่เลือก
+        unique_codes = ["ALL"] + sorted(filtered_data["รหัสร้าน"].dropna().unique().tolist())
+        selected_code = st.selectbox("Select Code", unique_codes)
+        
+        # กรองข้อมูลตามรหัสร้านที่เลือก
+        if selected_code != "ALL":
+            filtered_data = filtered_data[filtered_data["รหัสร้าน"] == selected_code]
+        
+        # อัปเดตรายการ Class Predict ตามรหัสร้านที่เลือก
+        unique_classes = ["ALL"] + sorted(filtered_data["Class Predict"].dropna().unique().tolist())
+        selected_class = st.selectbox("Select Class", unique_classes)
+        
+        # กรองข้อมูลตาม Class Predict ที่เลือก
         if selected_class != "ALL":
-            filtered_dataframe = filtered_dataframe[filtered_dataframe["Class Predict"] == selected_class]
+            filtered_data = filtered_data[filtered_data["Class Predict"] == selected_class]
         
-        st.dataframe(filtered_dataframe.reset_index(drop=True))
+        st.dataframe(filtered_data.reset_index(drop=True))
+
         
-        if not filtered_dataframe.empty:
+        if not filtered_data.empty:
             st.write("## Classification Distribution")
-            class_counts = filtered_dataframe["Class Predict"].value_counts()
+            class_counts = filtered_data["Class Predict"].value_counts()
             fig, ax = plt.subplots()
-            ax.pie((class_counts / len(filtered_dataframe)) * 100, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
+            ax.pie((class_counts / len(filtered_data)) * 100, labels=class_counts.index, autopct="%1.1f%%", startangle=90, colors=plt.cm.Paired.colors)
             ax.axis("equal")
             st.pyplot(fig)
         
         for result in st.session_state["rpa_results"]:
+            # ตรวจสอบว่า result["Code"] อยู่ในโซนที่เลือก
+            if selected_zone != "ALL":
+                if result["Code"] not in filtered_data["รหัสร้าน"].values:
+                    continue
+
+            # กรองตามรหัสร้าน
             if selected_code != "ALL" and result["Code"] != selected_code:
                 continue
+
+            # กรองตามประเภทการตรวจจับ
             if selected_class != "ALL" and not any(cls == selected_class for cls, _ in result["Detection Info"]):
                 continue
             st.markdown(f"#### รหัสร้าน: {result['Code']}")

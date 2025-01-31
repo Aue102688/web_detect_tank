@@ -90,12 +90,8 @@ try:
     selecting_part.click()
     time.sleep(2)
 
-<<<<<<< HEAD
     # year_put = int(sys.argv[4])
     year_put = int(sys.argv[5])
-=======
-    year_put = int(sys.argv[4])
->>>>>>> 98ff9ffcd82c80c0061443b5983cf6a2c5033726
 
     if year_put == 2023:
         year_select = driver.find_element(By.XPATH, '/html/body/div[1]/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-multi-year-view/table/tbody/tr[6]/td[2]/button/div[1]')
@@ -110,12 +106,8 @@ try:
         year_select.click()
         time.sleep(2)
 
-<<<<<<< HEAD
     # month_put = int(sys.argv[3])
     month_put = int(sys.argv[4])
-=======
-    month_put = int(sys.argv[3])
->>>>>>> 98ff9ffcd82c80c0061443b5983cf6a2c5033726
 
     month_table = {1: [2,1], 2: [2,2], 3: [2,3], 4: [2,4], 5: [3,1], 6: [3,2], 7: [3,3], 8: [3,4], 9: [4,1], 10: [4,2], 11: [4,3], 12: [4,4]}
     month_select = driver.find_element(By.XPATH, f'/html/body/div/div[2]/div/mat-datepicker-content/div[2]/mat-calendar/div/mat-year-view/table/tbody/tr[{month_table[month_put][0]}]/td[{month_table[month_put][1]}]/button')
