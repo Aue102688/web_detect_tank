@@ -1,11 +1,3 @@
-import subprocess
-
-# ตรวจสอบและติดตั้ง selenium หากไม่มี
-try:
-    import selenium
-except ImportError:
-    subprocess.run(["pip", "install", "selenium"], check=True)
-    import selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
