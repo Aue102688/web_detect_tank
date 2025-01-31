@@ -1,28 +1,20 @@
-import subprocess
-
-# ตรวจสอบและติดตั้ง selenium หากไม่มี
-try:
-    import selenium
-except ImportError:
-    subprocess.run(["pip", "install", "selenium"], check=True)
-    import selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
+# from selenium.webdriver.common.action_chains import ActionChains
 # from bs4 import BeautifulSoup
 import time
 import requests
-from PIL import Image
-from io import BytesIO
+# from PIL import Image
+# from io import BytesIO
 from datetime import datetime
 import os
-import shutil
-import urllib.parse
+# import shutil
+# import urllib.parse
 import math
 import sys
 import io

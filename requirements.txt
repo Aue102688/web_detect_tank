@@ -6,22 +6,47 @@ cycler==0.12.1
 filelock==3.17.0
 fonttools==4.55.8
 fsspec==2024.12.0
+<<<<<<< HEAD
 idna==3.10
 importlib_resources==6.5.2
 Jinja2==3.1.5
+=======
+gitdb==4.0.12
+GitPython==3.1.44
+h11==0.14.0
+hub-sdk==0.0.18
+idna==3.10
+importlib_resources==6.5.2
+Jinja2==3.1.5
+jsonschema==4.23.0
+jsonschema-specifications==2024.10.1
+>>>>>>> 54f24b409c1912f91edecf3b5fe52fc5bdf3bb91
 kiwisolver==1.4.7
 MarkupSafe==3.0.2
 matplotlib==3.9.4
 mpmath==1.3.0
 networkx==3.2.1
 numpy==2.0.2
+<<<<<<< HEAD
 opencv-python==4.11.0.86
 opencv-python-headless==4.11.0.86
+=======
+omegaconf==2.3.0
+opencv-python-headless==4.6.0.66
+outcome==1.3.0.post0
+>>>>>>> 54f24b409c1912f91edecf3b5fe52fc5bdf3bb91
 packaging==24.2
 pandas==2.2.3
 pillow==11.1.0
 psutil==6.1.1
 py-cpuinfo==9.0.0
+<<<<<<< HEAD
+=======
+pyarrow==19.0.0
+pycparser==2.22
+pydeck==0.9.1
+Pygments==2.19.1
+>>>>>>> 54f24b409c1912f91edecf3b5fe52fc5bdf3bb91
 pyparsing==3.2.1
 python-dateutil==2.9.0.post0
 pytz==2025.1
@@ -31,12 +56,26 @@ scipy==1.13.1
 seaborn==0.13.2
 six==1.17.0
 sympy==1.13.1
+<<<<<<< HEAD
+=======
+tenacity==9.0.0
+thop==0.1.1.post2209072238
+toml==0.10.2
+>>>>>>> 54f24b409c1912f91edecf3b5fe52fc5bdf3bb91
 torch==2.6.0
 torchvision==0.21.0
 tqdm==4.67.1
+<<<<<<< HEAD
 typing_extensions==4.12.2
 tzdata==2025.1
 ultralytics==8.3.70
+=======
+trio==0.28.0
+trio-websocket==0.11.1
+typing_extensions==4.12.2
+tzdata==2024.2
+ultralytics==8.1.0
+>>>>>>> 54f24b409c1912f91edecf3b5fe52fc5bdf3bb91
 ultralytics-thop==2.0.14
 urllib3==2.3.0
 zipp==3.21.0
