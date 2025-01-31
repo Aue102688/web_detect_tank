@@ -1,3 +1,11 @@
+import subprocess
+
+# ตรวจสอบและติดตั้ง selenium หากไม่มี
+try:
+    import selenium
+except ImportError:
+    subprocess.run(["pip", "install", "selenium"], check=True)
+    import selenium
 import streamlit as st
 from PIL import Image
 import numpy as np
